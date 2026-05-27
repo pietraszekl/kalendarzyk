@@ -1043,6 +1043,13 @@ export default function CyclePlanner() {
           </section>
         </div>
       )}
+      <footer className="site-footer">
+        <span>{t.madeWith} <span aria-label="love">&#10084;&#65039;</span> {t.by}{" "}
+        <a href="https://digitalhabitat.it/" target="_blank" rel="noopener noreferrer">Digital Habitat</a></span>
+        <span className="footer-separator" aria-hidden="true">·</span>
+        <span>{t.openSource}{" "}
+        <a href="https://github.com/pietraszekl/kalendarzyk" target="_blank" rel="noopener noreferrer">GitHub</a></span>
+      </footer>
     </main>
   );
 }

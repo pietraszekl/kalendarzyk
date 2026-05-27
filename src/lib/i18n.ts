@@ -97,6 +97,9 @@ export const copy = {
     selectedDay: "Szczegóły dnia",
     calendarFootnote:
       "Oznaczenia cyklu są orientacyjne i nie stanowią antykoncepcji ani porady medycznej. Dane pozostają na tym urządzeniu.",
+    madeWith: "Stworzone z",
+    by: "przez",
+    openSource: "Projekt open source na",
     validation: {
       lastPeriodRequired: "Podaj pierwszy dzień ostatniej miesiączki.",
       futureStart: "Data ostatniej miesiączki nie może być w przyszłości.",
@@ -209,6 +212,9 @@ export const copy = {
     selectedDay: "Day details",
     calendarFootnote:
       "Cycle markers are estimates, not contraception or medical advice. Data remains on this device.",
+    madeWith: "Made with",
+    by: "by",
+    openSource: "Open source project on",
     validation: {
       lastPeriodRequired: "Enter the first day of your last period.",
       futureStart: "The last period date cannot be in the future.",

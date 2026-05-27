@@ -1248,8 +1248,18 @@ legend {
   padding: 20px 0;
 }
 
-.site-footer p {
-  margin: 0;
+.footer-separator {
+  opacity: 0.4;
+}
+
+.site-footer a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.site-footer a:hover {
+  text-decoration: underline;
 }
 
 .modal-backdrop {

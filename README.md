@@ -1,33 +1,31 @@
 # Kalendarzyk
 
-Dwujęzyczna aplikacja webowa do prywatnego planowania wyjazdów oraz
-orientacyjnego podglądu kolejnych miesiączek, owulacji i okna płodnego.
-Dane użytkowniczki są przechowywane wyłącznie w `localStorage` jej
-przeglądarki; aplikacja nie ma kont ani backendu.
+Private cycle forecast and trip planner. All data stays in your browser.
 
-## Funkcje
+Bilingual travel calendar with end forecast decision - data remains local in the recipe.
 
-- prognoza na 6 lub 12 miesięcy na podstawie ostatniej miesiączki i typowej długości cyklu
-- dodawanie, edycja i usuwanie wielu planowanych wyjazdów także bez danych cyklu
-- wizualne nakładanie wyjazdów na prognozę oraz neutralne ikony przecięć dat
-- oznaczenia miesiączki, szacowanej owulacji i okna płodnego z możliwością ukrywania warstw
-- interfejs po polsku i angielsku
-- lokalny zapis ustawień i planów, wybór zakresu usuwania danych oraz eksport aktualnego widoku do PNG
-- stale widoczna informacja, że prognoza nie jest metodą antykoncepcji ani poradą medyczną
+## Features
 
-## Uruchomienie
+- Forecast 2,4,8or 12 months ahead based on your last period and typical cycle length
+- Add, edit and remove trips — works with or without cycle data
+- Visual overlay of trips on the cycle forecast with overlap indicators
+- Period, fertile window and ovulation markers — each layer can be toggled
+- Polish and English interface
+- Export the calendar view to PNG or .ics (iCalendar)
+- No accounts, no backend, no tracking — `localStorage` only
 
-Wymagane jest Node.js `>=20.9.0` oraz npm `>=8.3.0`; wersja npm musi
-obsługiwać nadpisanie poprawionej zależności `postcss`.
+## Getting started
+
+Requires Node.js `>=20.9.0` and npm `>=8.3.0`.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Aplikacja będzie dostępna pod adresem [http://localhost:3000](http://localhost:3000).
+The app will be available at [http://localhost:3000](http://localhost:3000).
 
-## Weryfikacja
+## Verification
 
 ```bash
 npm run lint
@@ -35,7 +33,20 @@ npm run test
 npm run build
 ```
 
-## Wdrożenie
+## Deployment
 
-Projekt jest standardową aplikacją Next.js App Router, gotową do wdrożenia na
-Vercelu bez zmiennych środowiskowych ani dodatkowych usług.
+Standard Next.js App Router application, deployable on Vercel or any Node.js host with no environment variables or external services required.
+
+## Privacy
+
+Kalendarzyk does not send data anywhere. Cycle settings, trips and preferences are stored exclusively in `localStorage`. There are no analytics, cookies or third-party scripts.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+
+## License
+
+This project is licensed under the [GNU General Public License v3.0](LICENSE).
+
+Copyright 2026 [Digital Habitat](https://digitalhabitat.it/)

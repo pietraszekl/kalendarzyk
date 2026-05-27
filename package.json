@@ -1,7 +1,24 @@
 {
   "name": "kalendarzyk",
   "version": "0.1.0",
-  "private": true,
+  "description": "Private cycle forecast and trip planner — all data stays in your browser",
+  "license": "GPL-3.0-only",
+  "author": "Digital Habitat",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pietraszekl/kalendarzyk.git"
+  },
+  "homepage": "https://github.com/pietraszekl/kalendarzyk",
+  "keywords": [
+    "cycle",
+    "period",
+    "fertility",
+    "forecast",
+    "trip-planner",
+    "privacy",
+    "nextjs",
+    "pwa"
+  ],
   "engines": {
     "node": ">=20.9.0",
     "npm": ">=8.3.0"
