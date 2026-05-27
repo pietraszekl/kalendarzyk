@@ -117,7 +117,7 @@ export const copy = {
     weekdays: ["Pn", "Wt", "Śr", "Cz", "Pt", "Sb", "Nd"],
   },
   en: {
-    appName: "Kalendarzyk",
+    appName: "Cycle Compass",
     eyebrow: "Private cycle forecast",
     title: "See the next stages of your cycle",
     subtitle:

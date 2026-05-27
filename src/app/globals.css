@@ -82,8 +82,16 @@ button:disabled {
 .brand {
   align-items: center;
   display: flex;
-  font-size: 1.08rem;
   gap: 10px;
+}
+
+.brand-name {
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  font-size: 1.42rem;
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: -0.055em;
+  line-height: 1;
 }
 
 .brand-mark {

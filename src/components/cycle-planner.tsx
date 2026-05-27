@@ -1062,7 +1062,7 @@ export default function CyclePlanner() {
           <span className="brand-mark" aria-hidden="true">
             <CycleCompassLogo />
           </span>
-          <strong>{t.appName}</strong>
+          <strong className="brand-name">{t.appName}</strong>
         </div>
         <label className="language-picker">
           <span>{t.language}</span>
