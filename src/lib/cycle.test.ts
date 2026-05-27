@@ -28,7 +28,7 @@ describe("cycle forecasting", () => {
   });
 
   it("creates bleeding, ovulation and fertile ranges from the cycle model", () => {
-    const forecast = generateForecast(input, "2026-05-27", 6);
+    const forecast = generateForecast(input, "2026-05-27", 4);
     const juneCycle = forecast.predictions.find(
       (prediction) => prediction.periodStart === "2026-06-01",
     );
@@ -47,12 +47,18 @@ describe("cycle forecasting", () => {
   });
 
   it("returns the configured month horizon and upcoming period list", () => {
-    const short = generateForecast(input, "2026-05-27", 6);
+    const compact = generateForecast(input, "2026-05-27", 2);
+    const short = generateForecast(input, "2026-05-27", 4);
+    const medium = generateForecast(input, "2026-05-27", 8);
     const long = generateForecast(input, "2026-05-27", 12);
 
-    expect(short.months).toHaveLength(6);
-    expect(short.viewEnd).toBe("2026-10-31");
+    expect(compact.months).toHaveLength(2);
+    expect(compact.viewEnd).toBe("2026-06-30");
+    expect(short.months).toHaveLength(4);
+    expect(short.viewEnd).toBe("2026-08-31");
     expect(short.upcoming[0].periodStart).toBe("2026-06-01");
+    expect(medium.months).toHaveLength(8);
+    expect(medium.viewEnd).toBe("2026-12-31");
     expect(long.months).toHaveLength(12);
     expect(long.viewEnd).toBe("2027-04-30");
   });
@@ -61,7 +67,7 @@ describe("cycle forecasting", () => {
     const forecast = generateForecast(
       { ...input, lastPeriodStart: "2026-05-27" },
       "2026-05-27",
-      6,
+      4,
     );
 
     expect(forecast.upcoming[0].periodStart).toBe("2026-06-24");
@@ -112,7 +118,7 @@ describe("trip planning", () => {
   });
 
   it("detects overlap with each forecast layer without interpreting it", () => {
-    const forecast = generateForecast(input, "2026-05-27", 6);
+    const forecast = generateForecast(input, "2026-05-27", 4);
     expect(tripOverlapLayers(trip, forecast.predictions)).toEqual([
       "period",
       "fertile",
@@ -128,7 +134,7 @@ describe("trip planning", () => {
       ],
       "2026-05-27",
     );
-    const window = createCalendarWindow("2026-05-27", 6);
+    const window = createCalendarWindow("2026-05-27", 4);
 
     expect(groups.past[0].id).toBe("past");
     expect(groups.planned[0].id).toBe("trip-1");
@@ -151,13 +157,35 @@ describe("trip planning", () => {
       cycle: input,
       trips: [],
       locale: "pl",
-      horizonMonths: 6,
+      horizonMonths: 4,
       visibleLayers: {
         period: true,
         fertile: false,
         ovulation: true,
         trips: true,
       },
+    });
+  });
+
+  it("normalizes previously saved horizon options without dropping state", () => {
+    expect(
+      migrateStoredState({
+        storageVersion: 2,
+        cycle: input,
+        trips: [trip],
+        locale: "pl",
+        horizonMonths: 9,
+        visibleLayers: {
+          period: true,
+          fertile: true,
+          ovulation: true,
+          trips: true,
+        },
+      }),
+    ).toMatchObject({
+      cycle: input,
+      trips: [trip],
+      horizonMonths: 8,
     });
   });
 });

@@ -79,6 +79,11 @@ interface TripFormValues {
   endDate: string;
 }
 
+interface CalendarDayCell {
+  date: string;
+  isOutsideMonth: boolean;
+}
+
 const EMPTY_CYCLE_FORM: CycleFormValues = {
   lastPeriodStart: "",
   cycleLengthDays: "28",
@@ -198,10 +203,16 @@ function CalendarMonth({
     date.getMonth() + 1,
     0,
   ).getDate();
-  const cells = Array.from({ length: leadingDays + daysInMonth }, (_, index) =>
-    index < leadingDays ? null : addDays(month, index - leadingDays),
-  );
-  while (cells.length % 7 !== 0) cells.push(null);
+  const monthEnd = addDays(month, daysInMonth - 1);
+  const firstVisibleDate = addDays(month, -leadingDays);
+  const visibleCellCount = leadingDays + daysInMonth > 35 ? 42 : 35;
+  const cells: CalendarDayCell[] = Array.from({ length: visibleCellCount }, (_, index) => {
+    const value = addDays(firstVisibleDate, index);
+    return {
+      date: value,
+      isOutsideMonth: value < month || value > monthEnd,
+    };
+  });
   const weeks = Array.from({ length: cells.length / 7 }, (_, index) =>
     cells.slice(index * 7, index * 7 + 7),
   );
@@ -266,9 +277,9 @@ function CalendarMonth({
     );
   }
 
-  const isCurrent = today >= month && today <= addDays(month, daysInMonth - 1);
+  const isCurrent = today >= month && today <= monthEnd;
   const selectedEvents =
-    selectedDate && selectedDate >= month && selectedDate <= addDays(month, daysInMonth - 1)
+    selectedDate && selectedDate >= month && selectedDate <= monthEnd
       ? visibleEvents.filter((event) =>
           isInRange(selectedDate, event.startDate, event.endDate),
         )
@@ -286,9 +297,18 @@ function CalendarMonth({
         {weeks.map((week, weekIndex) => (
           <div className="calendar-week" key={`week-${weekIndex}`}>
             <div className="calendar-grid">
-              {week.map((value, index) => {
+              {week.map((cell, index) => {
                 const isWeekend = index >= 5;
-                if (!value) return <span className={`day blank${isWeekend ? " day-weekend" : ""}`} key={`blank-${weekIndex}-${index}`} />;
+                const value = cell.date;
+                if (cell.isOutsideMonth) {
+                  return (
+                    <span
+                      aria-hidden="true"
+                      className="day day-placeholder"
+                      key={value}
+                    />
+                  );
+                }
                 const cycleLayers = layersForDate(value, predictions).filter(
                   (layer) => layers[layer],
                 );
@@ -532,7 +552,7 @@ export default function CyclePlanner() {
   }, [drawerOpen, isMobile]);
 
   const calendarWindow = useMemo(
-    () => createCalendarWindow(today, app?.horizonMonths ?? 6),
+    () => createCalendarWindow(today, app?.horizonMonths ?? 4),
     [app?.horizonMonths, today],
   );
   const forecast = useMemo(
@@ -860,6 +880,12 @@ export default function CyclePlanner() {
 
   function renderSummaryPanel() {
     const current = app!;
+    const horizonLabels: Record<HorizonMonths, string> = {
+      2: t.months2,
+      4: t.months4,
+      8: t.months8,
+      12: t.months12,
+    };
     return (
       <section className="summary-panel">
         <div className="summary-intro">
@@ -869,10 +895,10 @@ export default function CyclePlanner() {
         </div>
         <fieldset>
           <legend>{t.showMonths}</legend>
-          <div className="segmented">
-            {([6, 12] as HorizonMonths[]).map((months) => (
-              <button aria-pressed={current.horizonMonths === months} className={current.horizonMonths === months ? "active" : ""} key={months} onClick={() => updateSettings({ horizonMonths: months })} type="button">
-                {months === 6 ? t.months6 : t.months12}
+          <div className="segmented horizon-picker">
+            {([2, 4, 8, 12] as HorizonMonths[]).map((months) => (
+              <button aria-label={horizonLabels[months]} aria-pressed={current.horizonMonths === months} className={current.horizonMonths === months ? "active" : ""} key={months} onClick={() => updateSettings({ horizonMonths: months })} type="button">
+                {months}
               </button>
             ))}
           </div>
@@ -895,16 +921,16 @@ export default function CyclePlanner() {
               <article><Leaf size={17} /><span>{t.nextFertile}</span><strong>{nextFertile ? formatRange(nextFertile.start, nextFertile.end, locale) : "-"}</strong></article>
             </div>
             {validation?.atypicalCycle && <div className="warning" role="note"><Info size={18} /><p>{t.atypical}</p></div>}
-            <div className="disclaimer" role="note"><Info size={18} /><div><strong>{t.disclaimerTitle}</strong><p>{t.disclaimer}</p></div></div>
+
           </>
         ) : (
           <div className="calendar-note" role="note"><Plane size={18} /><div><strong>{t.noCycleTitle}</strong><p>{t.noCycleText}</p><button className="cycle-action" onClick={goToCycle} type="button">{t.addCycleDetails}</button></div></div>
         )}
         {hasData && (
           <div className="actions-panel">
-            <button type="button" onClick={() => setShowExport(true)}><Download size={16} />{t.export}</button>
-            <button type="button" onClick={downloadIcs}><CalendarPlus size={16} />{t.exportIcs}</button>
-            <button className="delete-button" type="button" onClick={() => setShowDelete(true)}><Trash2 size={16} />{t.delete}</button>
+            <button aria-label={t.exportAria} onClick={() => setShowExport(true)} title={t.exportAria} type="button"><Download size={19} /></button>
+            <button aria-label={t.exportIcsAria} onClick={downloadIcs} title={t.exportIcsAria} type="button"><CalendarPlus size={19} /></button>
+            <button aria-label={t.deleteAria} className="delete-button" onClick={() => setShowDelete(true)} title={t.deleteAria} type="button"><Trash2 size={19} /></button>
           </div>
         )}
       </section>

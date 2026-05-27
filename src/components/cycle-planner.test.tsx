@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toPng } from "html-to-image";
 import CyclePlanner from "@/components/cycle-planner";
-import { addDays, toDateKey } from "@/lib/cycle";
+import { addDays, addMonths, startOfMonth, toDateKey } from "@/lib/cycle";
 
 vi.mock("html-to-image", () => ({
   toPng: vi.fn().mockResolvedValue("data:image/png;base64,test"),
@@ -18,6 +18,10 @@ beforeEach(() => {
   });
   setMobileViewport(false);
   vi.mocked(toPng).mockClear();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 function setMobileViewport(matches: boolean) {
@@ -68,18 +72,103 @@ function addCycle() {
 
 describe("CyclePlanner", () => {
   it("places information in a tabbed sidebar and keeps the calendar compact", async () => {
+    vi.setSystemTime(new Date(2026, 4, 27, 12));
     const { container } = render(<CyclePlanner />);
     expect(await screen.findByRole("tab", { name: "Podsumowanie" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
     expect(screen.getByText("Dodaj cykl, aby porównać terminy")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Twoje dane są zapisywane wyłącznie w tej przeglądarce/),
+    ).toHaveTextContent("modele AI/LLM");
     expect(container.querySelector(".forecast-report")).not.toHaveTextContent(
       "Zakres prognozy",
     );
     expect(screen.getByRole("heading", { name: "Kalendarz" })).toBeInTheDocument();
     expect(container.querySelector(".month-card .day")).toBeInTheDocument();
     expect(container.querySelectorAll(".calendar-week .bar-lane")).not.toHaveLength(0);
+    const months = container.querySelectorAll(".month-card");
+    expect(months[0].querySelectorAll(".calendar-week")).toHaveLength(5);
+    expect(months[0].querySelectorAll(".day")).toHaveLength(35);
+    expect(months[3].querySelectorAll(".calendar-week")).toHaveLength(6);
+    expect(months[3].querySelectorAll(".day")).toHaveLength(42);
+  });
+
+  it("renders adjacent-month positions as empty placeholders without duplicated events", async () => {
+    vi.setSystemTime(new Date(2026, 5, 10, 12));
+    setMobileViewport(true);
+    const { container } = render(<CyclePlanner />);
+    const nextMonth = addMonths(startOfMonth(today()), 1);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Zarządzaj planami" }));
+    chooseTab("Wyjazdy");
+    fireEvent.change(screen.getByLabelText("Nazwa wyjazdu"), {
+      target: { value: "Pierwszy dzień miesiąca" },
+    });
+    fireEvent.change(screen.getByLabelText("Od"), {
+      target: { value: nextMonth },
+    });
+    fireEvent.change(screen.getByLabelText("Do"), {
+      target: { value: nextMonth },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Dodaj wyjazd" }));
+
+    const months = container.querySelectorAll(".month-card");
+    const placeholders = months[0].querySelectorAll(".day-placeholder");
+    expect(placeholders.length).toBeGreaterThan(0);
+    placeholders.forEach((placeholder) => {
+      expect(placeholder).toHaveAttribute("aria-hidden", "true");
+      expect(placeholder).toBeEmptyDOMElement();
+      expect(placeholder).not.toHaveAttribute("aria-label");
+    });
+    expect(months[0].querySelector(".bar-trips")).not.toBeInTheDocument();
+    expect(months[1].querySelector(".bar-trips")).toBeInTheDocument();
+
+    fireEvent.click(placeholders[0]);
+    expect(screen.queryByLabelText("Szczegóły dnia")).not.toBeInTheDocument();
+  });
+
+  it("keeps dates and events in a month that requires its sixth week", async () => {
+    vi.setSystemTime(new Date(2026, 2, 10, 12));
+    const { container } = render(<CyclePlanner />);
+    await screen.findByRole("tab", { name: "Podsumowanie" });
+    chooseTab("Wyjazdy");
+    fireEvent.change(screen.getByLabelText("Nazwa wyjazdu"), {
+      target: { value: "Koniec marca" },
+    });
+    fireEvent.change(screen.getByLabelText("Od"), {
+      target: { value: "2026-03-30" },
+    });
+    fireEvent.change(screen.getByLabelText("Do"), {
+      target: { value: "2026-03-31" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Dodaj wyjazd" }));
+
+    const march = container.querySelector(".month-card") as HTMLElement;
+    expect(march.querySelectorAll(".calendar-week")).toHaveLength(6);
+    expect(march.querySelectorAll(".day")).toHaveLength(42);
+    expect(march).toHaveTextContent("30");
+    expect(march).toHaveTextContent("31");
+    expect(march.querySelector(".bar-trips")).toHaveTextContent("Koniec marca");
+  });
+
+  it("switches between 2, 4, 8 and 12 months and stores the selected horizon", async () => {
+    const { container } = render(<CyclePlanner />);
+    await screen.findByRole("tab", { name: "Podsumowanie" });
+
+    for (const [label, expected] of [
+      ["2 miesiące", 2],
+      ["4 miesiące", 4],
+      ["8 miesięcy", 8],
+      ["12 miesięcy", 12],
+    ] as const) {
+      fireEvent.click(screen.getByRole("button", { name: label }));
+      expect(container.querySelectorAll(".month-card")).toHaveLength(expected);
+      expect(JSON.parse(localStorage.getItem(storageKey) ?? "{}").horizonMonths).toBe(
+        expected,
+      );
+    }
   });
 
   it("stores and restores the chosen panel tab separately from private data", async () => {
@@ -177,6 +266,10 @@ describe("CyclePlanner", () => {
     );
     render(<CyclePlanner />);
     await screen.findByRole("tab", { name: "Podsumowanie" });
+    expect(screen.getByRole("button", { name: "4 miesiące" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     chooseTab("Wyjazdy");
     addTrip("Lato");
     chooseTab("Podsumowanie");
@@ -189,6 +282,37 @@ describe("CyclePlanner", () => {
     fireEvent.click(screen.getByRole("button", { name: "Usuń dane" }));
     fireEvent.click(screen.getByRole("button", { name: "Usuń wszystko" }));
     expect(localStorage.getItem(panelTabKey)).toBeNull();
+  });
+
+  it("uses compact icon actions with localized accessible labels", async () => {
+    const { container } = render(<CyclePlanner />);
+    await screen.findByRole("tab", { name: "Wyjazdy" });
+    chooseTab("Wyjazdy");
+    addTrip("Akcje");
+    chooseTab("Podsumowanie");
+
+    const actions = container.querySelector(".actions-panel");
+    expect(actions).not.toHaveTextContent("Eksportuj");
+    expect(screen.getByRole("button", { name: "Eksportuj obraz PNG" })).toHaveAttribute(
+      "title",
+      "Eksportuj obraz PNG",
+    );
+    expect(screen.getByRole("button", { name: "Eksportuj do kalendarza (.ics)" })).toHaveAttribute(
+      "title",
+      "Eksportuj do kalendarza (.ics)",
+    );
+    expect(screen.getByRole("button", { name: "Usuń dane" })).toHaveAttribute(
+      "title",
+      "Usuń dane",
+    );
+
+    fireEvent.change(screen.getByLabelText("Język"), { target: { value: "en" } });
+    expect(
+      screen.getByText(/Your data is stored only in this browser/),
+    ).toHaveTextContent("never sent to third parties or processed by AI/LLM models");
+    expect(screen.getByRole("button", { name: "Export PNG image" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Export to calendar (.ics)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete data" })).toBeInTheDocument();
   });
 
   it("exports only the simplified calendar and respects a disabled trips layer", async () => {
@@ -210,9 +334,10 @@ describe("CyclePlanner", () => {
       expect(report).toHaveTextContent("Kalendarz");
       expect(report).toHaveTextContent("Góry");
       expect(report).not.toHaveTextContent("Nazwa wyjazdu");
+      expect(report.querySelector(".day-placeholder")).toBeEmptyDOMElement();
       return "data:image/png;base64,test";
     });
-    fireEvent.click(screen.getByRole("button", { name: "Eksportuj PNG" }));
+    fireEvent.click(screen.getByRole("button", { name: "Eksportuj obraz PNG" }));
     fireEvent.click(screen.getByRole("button", { name: "Pobierz PNG" }));
     await waitFor(() => expect(toPng).toHaveBeenCalled());
     expect(download).toHaveBeenCalled();

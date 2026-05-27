@@ -199,9 +199,10 @@ button:disabled {
 }
 
 .actions-panel {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: 9px;
+  grid-template-columns: repeat(3, 44px);
+  justify-content: start;
   padding: 18px;
 }
 
@@ -211,13 +212,11 @@ button:disabled {
   border: 1px solid var(--border);
   border-radius: 9px;
   color: var(--foreground);
-  display: flex;
-  flex: 1;
-  font-size: 0.84rem;
-  gap: 7px;
-  height: 39px;
+  display: inline-flex;
+  height: 44px;
   justify-content: center;
-  padding: 0 13px;
+  padding: 0;
+  width: 44px;
 }
 
 .actions-panel button:hover {
@@ -640,6 +639,17 @@ legend {
   color: var(--foreground);
 }
 
+.horizon-picker {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  width: 100%;
+}
+
+.horizon-picker button {
+  padding: 0;
+  width: 100%;
+}
+
 .layer-toggles {
   display: flex;
   flex-wrap: wrap;
@@ -908,8 +918,9 @@ legend {
   color: var(--muted);
 }
 
-.day.blank {
-  visibility: hidden;
+.day-placeholder {
+  background: #fdfcfb;
+  border-color: #f2eee9;
 }
 
 .calendar-weeks {
@@ -1127,6 +1138,8 @@ legend {
 }
 
 .summary-panel .actions-panel {
+  background: transparent;
+  border: 0;
   box-shadow: none;
   padding: 0;
 }

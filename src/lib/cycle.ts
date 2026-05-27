@@ -1,5 +1,5 @@
 export type Locale = "pl" | "en";
-export type HorizonMonths = 6 | 12;
+export type HorizonMonths = 2 | 4 | 8 | 12;
 export type CycleLayer = "period" | "fertile" | "ovulation";
 export type Layer = CycleLayer | "trips";
 
@@ -101,7 +101,7 @@ export function defaultAppState(locale: Locale): AppState {
     cycle: null,
     trips: [],
     locale,
-    horizonMonths: 6,
+    horizonMonths: 4,
     visibleLayers: { ...DEFAULT_LAYERS },
   };
 }
@@ -544,8 +544,12 @@ function isLocale(value: unknown): value is Locale {
   return value === "pl" || value === "en";
 }
 
-function isHorizon(value: unknown): value is HorizonMonths {
-  return value === 6 || value === 12;
+function normalizeHorizon(value: unknown): HorizonMonths | null {
+  if (value === 2 || value === 4 || value === 8 || value === 12) return value;
+  if (value === 3) return 2;
+  if (value === 6) return 4;
+  if (value === 9) return 8;
+  return null;
 }
 
 function isCycle(value: unknown): value is CycleInput {
@@ -583,18 +587,20 @@ function isLayers(value: unknown, includeTrips: boolean): boolean {
 export function migrateStoredState(value: unknown): AppState | null {
   if (!value || typeof value !== "object") return null;
   const current = value as Partial<AppState>;
+  const currentHorizon = normalizeHorizon(current.horizonMonths);
   if (
     current.storageVersion === 2 &&
     (current.cycle === null || isCycle(current.cycle)) &&
     Array.isArray(current.trips) &&
     current.trips.every(isTrip) &&
     isLocale(current.locale) &&
-    isHorizon(current.horizonMonths) &&
+    currentHorizon !== null &&
     isLayers(current.visibleLayers, true)
   ) {
-    return current as AppState;
+    return { ...current, horizonMonths: currentHorizon } as AppState;
   }
   const legacy = value as Partial<LegacySettings>;
+  const legacyHorizon = normalizeHorizon(legacy.horizonMonths);
   const legacyCycle = {
     lastPeriodStart: legacy.lastPeriodStart,
     cycleLengthDays: legacy.cycleLengthDays,
@@ -604,7 +610,7 @@ export function migrateStoredState(value: unknown): AppState | null {
     legacy.storageVersion === 1 &&
     isCycle(legacyCycle) &&
     isLocale(legacy.locale) &&
-    isHorizon(legacy.horizonMonths) &&
+    legacyHorizon !== null &&
     isLayers(legacy.visibleLayers, false)
   ) {
     return {
@@ -612,7 +618,7 @@ export function migrateStoredState(value: unknown): AppState | null {
       cycle: legacyCycle,
       trips: [],
       locale: legacy.locale,
-      horizonMonths: legacy.horizonMonths,
+      horizonMonths: legacyHorizon,
       visibleLayers: { ...legacy.visibleLayers, trips: true } as VisibleLayers,
     };
   }
