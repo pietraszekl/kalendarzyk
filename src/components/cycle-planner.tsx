@@ -2,7 +2,6 @@
 
 import { toPng } from "html-to-image";
 import {
-  CalendarDays,
   CalendarPlus,
   ChevronDown,
   Download,
@@ -82,6 +81,98 @@ interface TripFormValues {
 interface CalendarDayCell {
   date: string;
   isOutsideMonth: boolean;
+}
+
+function CycleCompassLogo({ size = 42 }: { size?: number }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className="cycle-compass-logo"
+      focusable="false"
+      height={size}
+      viewBox="0 0 48 48"
+      width={size}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M12.7 33.1A15 15 0 0 1 11.7 15.7"
+        fill="none"
+        stroke="var(--period)"
+        strokeLinecap="round"
+        strokeWidth="4"
+      />
+      <path
+        d="M15.1 12A15 15 0 0 1 32.7 11.2"
+        fill="none"
+        stroke="var(--fertile)"
+        strokeLinecap="round"
+        strokeWidth="4"
+      />
+      <path
+        d="M36.3 14.4A15 15 0 0 1 34.6 34.4"
+        fill="none"
+        stroke="var(--trips)"
+        strokeLinecap="round"
+        strokeWidth="4"
+      />
+      <path
+        d="M32.3 8L37.3 15.5L28.7 13.5"
+        fill="none"
+        stroke="var(--trips)"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="3.2"
+      />
+      <path
+        d="M24 7.4L27.2 20.8L24 18.8L20.8 20.8L24 7.4Z"
+        fill="var(--accent)"
+        stroke="var(--surface)"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M24 40.6L20.8 27.2L24 29.2L27.2 27.2L24 40.6Z"
+        fill="var(--accent)"
+        stroke="var(--surface)"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M7.4 24L20.8 20.8L18.8 24L20.8 27.2L7.4 24Z"
+        fill="var(--fertile)"
+        stroke="var(--surface)"
+        strokeLinejoin="round"
+        strokeWidth="1.6"
+      />
+      <path
+        d="M40.6 24L27.2 27.2L29.2 24L27.2 20.8L40.6 24Z"
+        fill="var(--fertile)"
+        stroke="var(--surface)"
+        strokeLinejoin="round"
+        strokeWidth="1.6"
+      />
+      <path
+        d="M14.2 14.2L22.2 20.8L20.8 22.2L14.2 14.2Z"
+        fill="var(--ovulation)"
+      />
+      <path
+        d="M33.8 14.2L27.2 22.2L25.8 20.8L33.8 14.2Z"
+        fill="var(--ovulation)"
+      />
+      <path
+        d="M33.8 33.8L25.8 27.2L27.2 25.8L33.8 33.8Z"
+        fill="var(--ovulation)"
+      />
+      <path
+        d="M14.2 33.8L20.8 25.8L22.2 27.2L14.2 33.8Z"
+        fill="var(--ovulation)"
+      />
+      <circle cx="24" cy="24" fill="var(--surface)" r="3" />
+      <circle cx="24" cy="24" fill="var(--accent)" r="1.45" />
+      <circle cx="35.4" cy="35.2" fill="var(--ovulation)" r="3.3" />
+      <circle cx="35.4" cy="35.2" fill="var(--surface)" r="1.15" />
+    </svg>
+  );
 }
 
 const EMPTY_CYCLE_FORM: CycleFormValues = {
@@ -969,7 +1060,7 @@ export default function CyclePlanner() {
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">
-            <CalendarDays size={18} />
+            <CycleCompassLogo />
           </span>
           <strong>{t.appName}</strong>
         </div>

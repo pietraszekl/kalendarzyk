@@ -82,6 +82,8 @@ describe("CyclePlanner", () => {
     expect(
       screen.getByText(/Twoje dane są zapisywane wyłącznie w tej przeglądarce/),
     ).toHaveTextContent("modele AI/LLM");
+    expect(container.querySelector(".cycle-compass-logo")).toBeInTheDocument();
+    expect(container.querySelector(".brand-mark svg")).toHaveAttribute("aria-hidden", "true");
     expect(container.querySelector(".forecast-report")).not.toHaveTextContent(
       "Zakres prognozy",
     );

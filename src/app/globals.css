@@ -88,13 +88,11 @@ button:disabled {
 
 .brand-mark {
   align-items: center;
-  background: var(--accent);
-  border-radius: 10px;
-  color: white;
+  color: var(--accent);
   display: flex;
-  height: 37px;
+  height: 44px;
   justify-content: center;
-  width: 37px;
+  width: 44px;
 }
 
 .language-picker {
