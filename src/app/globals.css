@@ -75,19 +75,20 @@ button:disabled {
   border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
-  min-height: 58px;
-  padding-bottom: 18px;
+  min-height: 66px;
+  padding-bottom: 16px;
 }
 
 .brand {
   align-items: center;
   display: flex;
-  gap: 10px;
+  gap: 12px;
+  min-width: 0;
 }
 
 .brand-name {
   font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
-  font-size: 1.42rem;
+  font-size: 1.5rem;
   font-style: italic;
   font-weight: 600;
   letter-spacing: -0.055em;
@@ -96,11 +97,15 @@ button:disabled {
 
 .brand-mark {
   align-items: center;
-  color: var(--accent);
   display: flex;
-  height: 44px;
+  flex: 0 0 auto;
+  height: 58px;
   justify-content: center;
-  width: 44px;
+  width: 58px;
+}
+
+.cycle-compass-logo {
+  overflow: visible;
 }
 
 .language-picker {
@@ -1350,7 +1355,21 @@ legend {
   }
 
   .topbar {
-    padding-bottom: 13px;
+    min-height: 58px;
+    padding-bottom: 12px;
+  }
+
+  .brand {
+    gap: 10px;
+  }
+
+  .brand-name {
+    font-size: 1.32rem;
+  }
+
+  .brand-mark {
+    height: 50px;
+    width: 50px;
   }
 
   .language-picker span {

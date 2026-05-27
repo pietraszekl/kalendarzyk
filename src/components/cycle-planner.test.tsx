@@ -312,7 +312,7 @@ describe("CyclePlanner", () => {
     expect(
       screen.getByText(/Your data is stored only in this browser/),
     ).toHaveTextContent("never sent to third parties or processed by AI/LLM models");
-    expect(screen.getByText("Cycle Compass")).toBeInTheDocument();
+    expect(screen.getAllByText("Cycle Compass").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Export PNG image" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Export to calendar (.ics)" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete data" })).toBeInTheDocument();

@@ -83,94 +83,129 @@ interface CalendarDayCell {
   isOutsideMonth: boolean;
 }
 
-function CycleCompassLogo({ size = 42 }: { size?: number }) {
+function CycleCompassLogo({ size = 56 }: { size?: number }) {
   return (
     <svg
       aria-hidden="true"
       className="cycle-compass-logo"
       focusable="false"
       height={size}
-      viewBox="0 0 48 48"
+      viewBox="0 0 64 64"
       width={size}
       xmlns="http://www.w3.org/2000/svg"
     >
-      <path
-        d="M12.7 33.1A15 15 0 0 1 11.7 15.7"
-        fill="none"
-        stroke="var(--period)"
-        strokeLinecap="round"
-        strokeWidth="4"
+      <defs>
+        <linearGradient id="cycleCompassGlass" x1="11" x2="53" y1="5" y2="59">
+          <stop stopColor="#ffffff" stopOpacity="0.94" />
+          <stop offset="0.52" stopColor="#f4eee8" stopOpacity="0.75" />
+          <stop offset="1" stopColor="#e6dcd2" stopOpacity="0.84" />
+        </linearGradient>
+        <radialGradient id="cycleCompassGlow" cx="34%" cy="22%" r="70%">
+          <stop stopColor="#ffffff" stopOpacity="0.95" />
+          <stop offset="0.5" stopColor="#ffffff" stopOpacity="0.18" />
+          <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id="cycleCompassNorth" x1="32" x2="32" y1="7" y2="34">
+          <stop stopColor="#38766b" />
+          <stop offset="1" stopColor="#1f4f47" />
+        </linearGradient>
+        <linearGradient id="cycleCompassEast" x1="31" x2="56" y1="31" y2="31">
+          <stop stopColor="#4a79a6" />
+          <stop offset="1" stopColor="#244d7b" />
+        </linearGradient>
+        <linearGradient id="cycleCompassSouth" x1="32" x2="32" y1="57" y2="31">
+          <stop stopColor="#b7793d" />
+          <stop offset="1" stopColor="#8f5f32" />
+        </linearGradient>
+        <linearGradient id="cycleCompassWest" x1="8" x2="33" y1="31" y2="31">
+          <stop stopColor="#c86178" />
+          <stop offset="1" stopColor="#9f435a" />
+        </linearGradient>
+        <filter id="cycleCompassSoftShadow" colorInterpolationFilters="sRGB" x="-30%" y="-30%" width="160%" height="170%">
+          <feDropShadow dx="0" dy="5" stdDeviation="3.6" floodColor="#5f4a3d" floodOpacity="0.16" />
+          <feDropShadow dx="0" dy="1" stdDeviation="1" floodColor="#ffffff" floodOpacity="0.75" />
+        </filter>
+        <filter id="cycleCompassNeedleShadow" colorInterpolationFilters="sRGB" x="-24%" y="-24%" width="148%" height="148%">
+          <feDropShadow dx="0" dy="2" stdDeviation="1.4" floodColor="#3e2f29" floodOpacity="0.22" />
+        </filter>
+      </defs>
+      <rect
+        fill="url(#cycleCompassGlass)"
+        filter="url(#cycleCompassSoftShadow)"
+        height="54"
+        rx="19"
+        stroke="#ffffff"
+        strokeOpacity="0.82"
+        strokeWidth="1.2"
+        width="54"
+        x="5"
+        y="5"
       />
+      <rect fill="url(#cycleCompassGlow)" height="54" rx="19" width="54" x="5" y="5" />
       <path
-        d="M15.1 12A15 15 0 0 1 32.7 11.2"
+        d="M13 15.8C19.8 8.6 31.2 6.2 41.1 10.7"
         fill="none"
+        opacity="0.78"
         stroke="var(--fertile)"
         strokeLinecap="round"
-        strokeWidth="4"
+        strokeWidth="3.4"
       />
       <path
-        d="M36.3 14.4A15 15 0 0 1 34.6 34.4"
+        d="M48.8 18.2C55.5 28.1 53 42 43.2 49.2"
         fill="none"
+        opacity="0.78"
         stroke="var(--trips)"
         strokeLinecap="round"
-        strokeWidth="4"
+        strokeWidth="3.4"
       />
       <path
-        d="M32.3 8L37.3 15.5L28.7 13.5"
+        d="M22.2 52.8C12.6 48.6 7.3 38.2 9.3 28.1"
         fill="none"
-        stroke="var(--trips)"
+        opacity="0.78"
+        stroke="var(--period)"
         strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="3.2"
+        strokeWidth="3.4"
       />
-      <path
-        d="M24 7.4L27.2 20.8L24 18.8L20.8 20.8L24 7.4Z"
-        fill="var(--accent)"
-        stroke="var(--surface)"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-      <path
-        d="M24 40.6L20.8 27.2L24 29.2L27.2 27.2L24 40.6Z"
-        fill="var(--accent)"
-        stroke="var(--surface)"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-      <path
-        d="M7.4 24L20.8 20.8L18.8 24L20.8 27.2L7.4 24Z"
-        fill="var(--fertile)"
-        stroke="var(--surface)"
-        strokeLinejoin="round"
-        strokeWidth="1.6"
-      />
-      <path
-        d="M40.6 24L27.2 27.2L29.2 24L27.2 20.8L40.6 24Z"
-        fill="var(--fertile)"
-        stroke="var(--surface)"
-        strokeLinejoin="round"
-        strokeWidth="1.6"
-      />
-      <path
-        d="M14.2 14.2L22.2 20.8L20.8 22.2L14.2 14.2Z"
-        fill="var(--ovulation)"
-      />
-      <path
-        d="M33.8 14.2L27.2 22.2L25.8 20.8L33.8 14.2Z"
-        fill="var(--ovulation)"
-      />
-      <path
-        d="M33.8 33.8L25.8 27.2L27.2 25.8L33.8 33.8Z"
-        fill="var(--ovulation)"
-      />
-      <path
-        d="M14.2 33.8L20.8 25.8L22.2 27.2L14.2 33.8Z"
-        fill="var(--ovulation)"
-      />
-      <circle cx="24" cy="24" fill="var(--surface)" r="3" />
-      <circle cx="24" cy="24" fill="var(--accent)" r="1.45" />
-      <circle cx="35.4" cy="35.2" fill="var(--ovulation)" r="3.3" />
-      <circle cx="35.4" cy="35.2" fill="var(--surface)" r="1.15" />
+      <g filter="url(#cycleCompassNeedleShadow)">
+        <path
+          d="M32 7.8L37.4 27.3L32 23.9L26.6 27.3L32 7.8Z"
+          fill="url(#cycleCompassNorth)"
+          stroke="#fffaf4"
+          strokeLinejoin="round"
+          strokeWidth="1.45"
+        />
+        <path
+          d="M56.2 32L36.7 37.4L40.1 32L36.7 26.6L56.2 32Z"
+          fill="url(#cycleCompassEast)"
+          stroke="#fffaf4"
+          strokeLinejoin="round"
+          strokeWidth="1.45"
+        />
+        <path
+          d="M32 56.2L26.6 36.7L32 40.1L37.4 36.7L32 56.2Z"
+          fill="url(#cycleCompassSouth)"
+          stroke="#fffaf4"
+          strokeLinejoin="round"
+          strokeWidth="1.45"
+        />
+        <path
+          d="M7.8 32L27.3 26.6L23.9 32L27.3 37.4L7.8 32Z"
+          fill="url(#cycleCompassWest)"
+          stroke="#fffaf4"
+          strokeLinejoin="round"
+          strokeWidth="1.45"
+        />
+        <path d="M17.6 17.6L29.1 27.7L27.7 29.1L17.6 17.6Z" fill="var(--ovulation)" opacity="0.88" />
+        <path d="M46.4 17.6L36.3 29.1L34.9 27.7L46.4 17.6Z" fill="var(--period)" opacity="0.84" />
+        <path d="M46.4 46.4L34.9 36.3L36.3 34.9L46.4 46.4Z" fill="var(--fertile)" opacity="0.84" />
+        <path d="M17.6 46.4L27.7 34.9L29.1 36.3L17.6 46.4Z" fill="var(--trips)" opacity="0.84" />
+      </g>
+      <circle cx="32" cy="32" fill="#fffaf4" r="5.4" />
+      <circle cx="32" cy="32" fill="var(--accent)" r="3.25" />
+      <circle cx="32" cy="32" fill="#ffffff" opacity="0.78" r="1.1" />
+      <circle cx="48" cy="47.6" fill="var(--ovulation)" r="4.1" />
+      <circle cx="48" cy="47.6" fill="#fffaf4" r="1.45" />
+      <path d="M16 12.5C23 7.9 33 7.2 40.8 10.8" fill="none" opacity="0.55" stroke="#ffffff" strokeLinecap="round" strokeWidth="2.2" />
     </svg>
   );
 }
