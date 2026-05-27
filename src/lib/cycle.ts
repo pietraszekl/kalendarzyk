@@ -67,6 +67,13 @@ export interface CalendarBarSegment extends CalendarBarEvent {
   endsRange: boolean;
 }
 
+export interface CalendarBarLayout {
+  segments: CalendarBarSegment[];
+  hiddenByDate: Record<string, CalendarBarEvent[]>;
+}
+
+export const MAX_VISIBLE_CALENDAR_LANES = 4;
+
 export interface Forecast extends CalendarWindow {
   predictions: CyclePrediction[];
   upcoming: CyclePrediction[];
@@ -380,6 +387,65 @@ export function packCalendarBarLanes(
   });
 }
 
+const BAR_LAYER_PRIORITY: Record<Layer, number> = {
+  period: 0,
+  fertile: 1,
+  ovulation: 2,
+  trips: 3,
+};
+
+export function layoutCalendarBars(
+  month: string,
+  events: CalendarBarEvent[],
+  maxLanes = MAX_VISIBLE_CALENDAR_LANES,
+): CalendarBarLayout {
+  const monthStart = startOfMonth(month);
+  const monthEnd = endOfMonth(month);
+  const laneEnds: string[] = [];
+  const hiddenByDate: Record<string, CalendarBarEvent[]> = {};
+  const sorted = [...events]
+    .filter((event) =>
+      rangesIntersect(event.startDate, event.endDate, monthStart, monthEnd),
+    )
+    .sort(
+      (first, second) =>
+        BAR_LAYER_PRIORITY[first.layer] - BAR_LAYER_PRIORITY[second.layer] ||
+        first.startDate.localeCompare(second.startDate) ||
+        first.endDate.localeCompare(second.endDate) ||
+        first.label.localeCompare(second.label) ||
+        first.id.localeCompare(second.id),
+    );
+
+  const segments = sorted.flatMap((event) => {
+    const clippedStart =
+      event.startDate > monthStart ? event.startDate : monthStart;
+    const clippedEnd = event.endDate < monthEnd ? event.endDate : monthEnd;
+    let lane = laneEnds.findIndex((end) => end < clippedStart);
+
+    if (lane === -1 && laneEnds.length < maxLanes) {
+      lane = laneEnds.length;
+      laneEnds.push(clippedEnd);
+    } else if (lane !== -1) {
+      laneEnds[lane] = clippedEnd;
+    }
+
+    if (lane === -1) {
+      for (
+        let date = clippedStart;
+        date <= clippedEnd;
+        date = addDays(date, 1)
+      ) {
+        hiddenByDate[date] = [...(hiddenByDate[date] ?? []), event];
+      }
+      return [];
+    }
+
+    return segmentCalendarBar(month, event, lane);
+  });
+
+  return { segments, hiddenByDate };
+}
+
 export function sortTrips(trips: Trip[]): Trip[] {
   return [...trips].sort(
     (first, second) =>
@@ -442,6 +508,36 @@ export function tripOverlapLayers(
   return ["period", "fertile", "ovulation"].filter((layer) =>
     overlap.has(layer as CycleLayer),
   ) as CycleLayer[];
+}
+
+export interface IcsEvent {
+  uid: string;
+  summary: string;
+  startDate: string;
+  endDate: string;
+}
+
+export function generateIcsCalendar(events: IcsEvent[]): string {
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Kalendarzyk//Cycle Planner//EN",
+    "CALSCALE:GREGORIAN",
+  ];
+  for (const event of events) {
+    const dtStart = event.startDate.replace(/-/g, "");
+    const dtEnd = addDays(event.endDate, 1).replace(/-/g, "");
+    lines.push(
+      "BEGIN:VEVENT",
+      `UID:${event.uid}`,
+      `DTSTART;VALUE=DATE:${dtStart}`,
+      `DTEND;VALUE=DATE:${dtEnd}`,
+      `SUMMARY:${event.summary}`,
+      "END:VEVENT",
+    );
+  }
+  lines.push("END:VCALENDAR");
+  return lines.join("\r\n");
 }
 
 function isLocale(value: unknown): value is Locale {

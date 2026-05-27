@@ -35,13 +35,14 @@ export const copy = {
     fertile: "Okno płodne",
     ovulation: "Owulacja",
     trips: "Wyjazdy",
-    periodShort: "M.",
-    fertileShort: "Pł.",
-    ovulationShort: "Ow.",
+    periodShort: "Miesiączka",
+    fertileShort: "Płodne",
+    ovulationShort: "Owulacja",
     showMonths: "Zakres prognozy",
     months6: "6 miesięcy",
     months12: "12 miesięcy",
     export: "Eksportuj PNG",
+    exportIcs: "Eksportuj do kalendarza (.ics)",
     delete: "Usuń dane",
     disclaimerTitle: "To jest orientacyjna prognoza",
     disclaimer:
@@ -67,6 +68,7 @@ export const copy = {
     tripSectionIntro: "Plany zapisane tylko na tym urządzeniu.",
     managePlans: "Zarządzaj planami",
     managePanelTitle: "Zarządzaj danymi",
+    manageSummaryTab: "Podsumowanie",
     manageTripsTab: "Wyjazdy",
     manageCycleTab: "Cykl",
     closePanel: "Zamknij panel",
@@ -87,6 +89,9 @@ export const copy = {
     overlapsWith: "Nakłada się z prognozą:",
     travelOnlyNote:
       "Dodaj dane cyklu, aby zobaczyć, jak wyjazdy nakładają się z prognozą.",
+    selectedDay: "Szczegóły dnia",
+    calendarFootnote:
+      "Oznaczenia cyklu są orientacyjne i nie stanowią antykoncepcji ani porady medycznej. Dane pozostają na tym urządzeniu.",
     validation: {
       lastPeriodRequired: "Podaj pierwszy dzień ostatniej miesiączki.",
       futureStart: "Data ostatniej miesiączki nie może być w przyszłości.",
@@ -137,13 +142,14 @@ export const copy = {
     fertile: "Fertile window",
     ovulation: "Ovulation",
     trips: "Trips",
-    periodShort: "P.",
-    fertileShort: "F.",
-    ovulationShort: "Ov.",
+    periodShort: "Period",
+    fertileShort: "Fertile",
+    ovulationShort: "Ovulation",
     showMonths: "Forecast range",
     months6: "6 months",
     months12: "12 months",
     export: "Export PNG",
+    exportIcs: "Export to calendar (.ics)",
     delete: "Delete data",
     disclaimerTitle: "This is an estimate",
     disclaimer:
@@ -169,6 +175,7 @@ export const copy = {
     tripSectionIntro: "Plans stored only on this device.",
     managePlans: "Manage plans",
     managePanelTitle: "Manage details",
+    manageSummaryTab: "Summary",
     manageTripsTab: "Trips",
     manageCycleTab: "Cycle",
     closePanel: "Close panel",
@@ -189,6 +196,9 @@ export const copy = {
     overlapsWith: "Overlaps with forecast:",
     travelOnlyNote:
       "Add cycle details to see how trips overlap with your forecast.",
+    selectedDay: "Day details",
+    calendarFootnote:
+      "Cycle markers are estimates, not contraception or medical advice. Data remains on this device.",
     validation: {
       lastPeriodRequired: "Enter the first day of your last period.",
       futureStart: "The last period date cannot be in the future.",

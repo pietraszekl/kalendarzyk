@@ -3,6 +3,7 @@
 import { toPng } from "html-to-image";
 import {
   CalendarDays,
+  CalendarPlus,
   ChevronDown,
   Download,
   Droplets,
@@ -41,12 +42,14 @@ import {
   createCalendarWindow,
   defaultAppState,
   generateForecast,
+  generateIcsCalendar,
+  IcsEvent,
+  isInRange,
   isTripVisible,
+  layoutCalendarBars,
   layersForDate,
   migrateStoredState,
-  packCalendarBarLanes,
   parseDateKey,
-  segmentCalendarBar,
   splitTrips,
   toDateKey,
   tripOverlapLayers,
@@ -59,9 +62,10 @@ import { copy, dateLocale, layerName } from "@/lib/i18n";
 const STORAGE_KEY = "kalendarzyk.settings.v2";
 const LEGACY_STORAGE_KEY = "kalendarzyk.settings.v1";
 const LOCALE_KEY = "kalendarzyk.locale";
+const PANEL_TAB_KEY = "kalendarzyk.panelTab";
 const MOBILE_QUERY = "(max-width: 820px)";
 
-type DrawerTab = "trips" | "cycle";
+type PanelTab = "summary" | "trips" | "cycle";
 
 interface CycleFormValues {
   lastPeriodStart: string;
@@ -89,6 +93,10 @@ const EMPTY_TRIP_FORM: TripFormValues = {
 
 function isLocale(value: unknown): value is Locale {
   return value === "pl" || value === "en";
+}
+
+function isPanelTab(value: unknown): value is PanelTab {
+  return value === "summary" || value === "trips" || value === "cycle";
 }
 
 function detectLocale(): Locale {
@@ -167,12 +175,20 @@ function CalendarMonth({
   trips,
   layers,
   locale,
+  today,
+  isMobile,
+  selectedDate,
+  onSelectDate,
 }: {
   month: string;
   predictions: CyclePrediction[];
   trips: Trip[];
   layers: VisibleLayers;
   locale: Locale;
+  today: string;
+  isMobile: boolean;
+  selectedDate: string | null;
+  onSelectDate: (date: string) => void;
 }) {
   const t = copy[locale];
   const date = parseDateKey(month);
@@ -215,26 +231,19 @@ function CalendarMonth({
       },
     ],
   );
-  const cycleSegments = (["period", "fertile", "ovulation"] as CycleLayer[])
-    .filter((layer) => layers[layer])
-    .map((layer) => ({
-      layer,
-      segments: cycleEvents
-        .filter((event) => event.layer === layer)
-        .flatMap((event) => segmentCalendarBar(month, event)),
-    }));
-  const tripSegments = layers.trips
-    ? packCalendarBarLanes(
-        month,
-        trips.map((trip) => ({
+  const visibleEvents: CalendarBarEvent[] = [
+    ...cycleEvents.filter((event) => layers[event.layer]),
+    ...(layers.trips
+      ? trips.map((trip) => ({
           id: `trip-${trip.id}`,
-          layer: "trips",
+          layer: "trips" as const,
           label: trip.name,
           startDate: trip.startDate,
           endDate: trip.endDate,
-        })),
-      )
-    : [];
+        }))
+      : []),
+  ];
+  const layout = layoutCalendarBars(month, visibleEvents);
 
   function renderSegment(segment: CalendarBarSegment) {
     const accessibleLabel =
@@ -251,13 +260,22 @@ function CalendarMonth({
           gridColumn: `${segment.column} / span ${segment.span}`,
         }}
       >
+        <LayerIcon layer={segment.layer} size={10} />
         {segment.showLabel && <span>{segment.label}</span>}
       </span>
     );
   }
 
+  const isCurrent = today >= month && today <= addDays(month, daysInMonth - 1);
+  const selectedEvents =
+    selectedDate && selectedDate >= month && selectedDate <= addDays(month, daysInMonth - 1)
+      ? visibleEvents.filter((event) =>
+          isInRange(selectedDate, event.startDate, event.endDate),
+        )
+      : [];
+
   return (
-    <section className="month-card" aria-label={title}>
+    <section className={`month-card${isCurrent ? " month-current" : ""}`} aria-label={title}>
       <h4>{title}</h4>
       <div className="calendar-grid weekday-row" aria-hidden="true">
         {t.weekdays.map((day) => (
@@ -269,7 +287,8 @@ function CalendarMonth({
           <div className="calendar-week" key={`week-${weekIndex}`}>
             <div className="calendar-grid">
               {week.map((value, index) => {
-                if (!value) return <span className="day blank" key={`blank-${weekIndex}-${index}`} />;
+                const isWeekend = index >= 5;
+                if (!value) return <span className={`day blank${isWeekend ? " day-weekend" : ""}`} key={`blank-${weekIndex}-${index}`} />;
                 const cycleLayers = layersForDate(value, predictions).filter(
                   (layer) => layers[layer],
                 );
@@ -278,44 +297,56 @@ function CalendarMonth({
                   ...cycleLayers.map((layer) => layerName(locale, layer)),
                   ...matchingTrips.map((trip) => `${t.trips}: ${trip.name}`),
                 ].join(", ");
+                const isToday = value === today;
                 return (
-                  <span
+                  <button
                     aria-label={
                       description
                         ? `${formatDate(value, locale)}: ${description}`
                         : formatDate(value, locale)
                     }
-                    className="day"
+                    aria-expanded={isMobile ? selectedDate === value : undefined}
+                    className={`day${isToday ? " day-today" : ""}${isWeekend ? " day-weekend" : ""}`}
                     key={value}
+                    onClick={() => isMobile && onSelectDate(value)}
+                    type="button"
                   >
-                    {parseDateKey(value).getDate()}
-                  </span>
+                    <span className="day-number">{parseDateKey(value).getDate()}</span>
+                    {(layout.hiddenByDate[value]?.length ?? 0) > 0 && (
+                      <small className="day-overflow">+{layout.hiddenByDate[value].length}</small>
+                    )}
+                  </button>
                 );
               })}
             </div>
             <div className="calendar-bars">
-              {cycleSegments.map(({ layer, segments }) => {
-                const weekSegments = segments.filter((segment) => segment.week === weekIndex);
-                return weekSegments.length > 0 ? (
-                  <div className={`bar-lane lane-${layer}`} key={layer}>
-                    {weekSegments.map(renderSegment)}
-                  </div>
-                ) : null;
-              })}
-              {Array.from(new Set(tripSegments.map((segment) => segment.lane))).map((lane) => {
-                const weekSegments = tripSegments.filter(
+              {Array.from({ length: 4 }, (_, lane) => {
+                const weekSegments = layout.segments.filter(
                   (segment) => segment.week === weekIndex && segment.lane === lane,
                 );
-                return weekSegments.length > 0 ? (
-                  <div className="bar-lane lane-trips" key={`trips-${lane}`}>
+                return (
+                  <div className="bar-lane" key={`lane-${lane}`}>
                     {weekSegments.map(renderSegment)}
                   </div>
-                ) : null;
+                );
               })}
             </div>
           </div>
         ))}
       </div>
+      {isMobile && selectedDate && selectedEvents.length > 0 && (
+        <section className="day-details" aria-label={t.selectedDay}>
+          <strong>{formatDate(selectedDate, locale)}</strong>
+          <ul>
+            {selectedEvents.map((event) => (
+              <li className={`detail-${event.layer}`} key={event.id}>
+                <LayerIcon layer={event.layer} size={14} />
+                {event.layer === "trips" ? event.label : layerName(locale, event.layer)}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </section>
   );
 }
@@ -338,7 +369,7 @@ function Legend({
         .filter((layer) => layers[layer])
         .map((layer) => (
           <li className={`legend-${layer}`} key={layer}>
-            <span aria-hidden="true" className={`legend-bar bar-${layer}`} />
+            <LayerIcon layer={layer} size={12} />
             {layerName(locale, layer)}
           </li>
         ))}
@@ -407,7 +438,8 @@ export default function CyclePlanner() {
   const [exportError, setExportError] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [drawerTab, setDrawerTab] = useState<DrawerTab>("trips");
+  const [panelTab, setPanelTab] = useState<PanelTab>("summary");
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
   const drawerCloseRef = useRef<HTMLButtonElement>(null);
@@ -436,9 +468,11 @@ export default function CyclePlanner() {
       localStorage.removeItem(LEGACY_STORAGE_KEY);
     }
     const initialState = restored ?? defaultAppState(fallbackLocale);
+    const savedPanelTab = localStorage.getItem(PANEL_TAB_KEY);
     // Browser-only preferences are available only after hydration.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setApp(initialState);
+    if (isPanelTab(savedPanelTab)) setPanelTab(savedPanelTab);
     if (initialState.cycle) {
       setCycleForm({
         lastPeriodStart: initialState.cycle.lastPeriodStart,
@@ -511,9 +545,6 @@ export default function CyclePlanner() {
   const predictions = forecast?.predictions ?? [];
   const validation = app?.cycle ? validateCycleInput(app.cycle, today) : null;
   const categorizedTrips = splitTrips(app?.trips ?? [], today);
-  const visibleTrips = (app?.trips ?? []).filter((trip) =>
-    isTripVisible(trip, calendarWindow),
-  );
   const hasData = !!app?.cycle || (app?.trips.length ?? 0) > 0;
 
   function updateApp(updater: (previous: AppState) => AppState) {
@@ -530,9 +561,14 @@ export default function CyclePlanner() {
     updateApp((previous) => ({ ...previous, locale: nextLocale }));
   }
 
-  function openDrawer(tab: DrawerTab) {
+  function selectPanelTab(tab: PanelTab) {
+    setPanelTab(tab);
+    localStorage.setItem(PANEL_TAB_KEY, tab);
+  }
+
+  function openDrawer(tab?: PanelTab) {
     previousFocusRef.current = document.activeElement as HTMLElement | null;
-    setDrawerTab(tab);
+    if (tab) selectPanelTab(tab);
     setDrawerOpen(true);
   }
 
@@ -574,6 +610,7 @@ export default function CyclePlanner() {
   }
 
   function editTrip(trip: Trip) {
+    selectPanelTab("trips");
     setEditingTripId(trip.id);
     setTripForm({
       name: trip.name,
@@ -619,6 +656,7 @@ export default function CyclePlanner() {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(LEGACY_STORAGE_KEY);
     localStorage.removeItem(LOCALE_KEY);
+    localStorage.removeItem(PANEL_TAB_KEY);
     const reset = defaultAppState(detectLocale());
     setApp(reset);
     setCycleForm(EMPTY_CYCLE_FORM);
@@ -626,6 +664,8 @@ export default function CyclePlanner() {
     setEditingTripId(null);
     setCycleErrors([]);
     setTripErrors([]);
+    setPanelTab("summary");
+    setSelectedDate(null);
     setShowDelete(false);
   }
 
@@ -651,6 +691,49 @@ export default function CyclePlanner() {
       reportRef.current?.classList.remove("export-capture");
       setExporting(false);
     }
+  }
+
+  function downloadIcs() {
+    if (!app) return;
+    const t = copy[app.locale];
+    const events: IcsEvent[] = [];
+    if (forecast) {
+      for (const prediction of forecast.predictions) {
+        events.push({
+          uid: `period-${prediction.periodStart}@kalendarzyk`,
+          summary: t.period,
+          startDate: prediction.periodStart,
+          endDate: prediction.periodEnd,
+        });
+        events.push({
+          uid: `fertile-${prediction.fertileStart}@kalendarzyk`,
+          summary: t.fertile,
+          startDate: prediction.fertileStart,
+          endDate: prediction.fertileEnd,
+        });
+        events.push({
+          uid: `ovulation-${prediction.ovulation}@kalendarzyk`,
+          summary: t.ovulation,
+          startDate: prediction.ovulation,
+          endDate: prediction.ovulation,
+        });
+      }
+    }
+    for (const trip of app.trips) {
+      events.push({
+        uid: `trip-${trip.id}@kalendarzyk`,
+        summary: `${t.trips}: ${trip.name}`,
+        startDate: trip.startDate,
+        endDate: trip.endDate,
+      });
+    }
+    const ics = generateIcsCalendar(events);
+    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+    const link = document.createElement("a");
+    link.download = `kalendarzyk-${today}.ics`;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+    URL.revokeObjectURL(link.href);
   }
 
   if (!ready || !app) return <main className="loading-shell" aria-label="Kalendarzyk" />;
@@ -694,7 +777,7 @@ export default function CyclePlanner() {
           )}
           <button className="primary-button" type="submit">{forecast ? t.update : t.calculate}</button>
         </form>
-        <p className="privacy-note"><LockKeyhole size={16} />{t.privacy}</p>
+        <p className="privacy-note"><LockKeyhole size={15} />{t.privacy}</p>
       </aside>
     );
   }
@@ -746,27 +829,112 @@ export default function CyclePlanner() {
         </form>
         <section className="trip-list-section">
           <h3>{t.plannedTrips}</h3>
-          {categorizedTrips.planned.length === 0 ? (
-            <p className="no-trips">{t.noTrips}</p>
-          ) : (
+          {categorizedTrips.planned.length > 0 ? (
             <ul className="trip-list">
               {categorizedTrips.planned.map((trip) => (
                 <TripItem key={trip.id} trip={trip} locale={locale} window={calendarWindow} overlap={forecast ? tripOverlapLayers(trip, predictions) : []} onEdit={editTrip} onRemove={removeTrip} />
               ))}
             </ul>
+          ) : (
+            <p className="no-trips">{t.noTrips}</p>
+          )}
+          {categorizedTrips.past.length > 0 && (
+            <details className="past-trips">
+              <summary><ChevronDown size={15} />{t.pastTrips} ({categorizedTrips.past.length})</summary>
+              <ul className="trip-list">
+                {categorizedTrips.past.map((trip) => (
+                  <TripItem key={trip.id} trip={trip} locale={locale} window={calendarWindow} overlap={forecast ? tripOverlapLayers(trip, predictions) : []} onEdit={editTrip} onRemove={removeTrip} />
+                ))}
+              </ul>
+            </details>
           )}
         </section>
-        {categorizedTrips.past.length > 0 && (
-          <details className="past-trips">
-            <summary><ChevronDown size={15} />{t.pastTrips} ({categorizedTrips.past.length})</summary>
-            <ul className="trip-list">
-              {categorizedTrips.past.map((trip) => (
-                <TripItem key={trip.id} trip={trip} locale={locale} window={calendarWindow} overlap={forecast ? tripOverlapLayers(trip, predictions) : []} onEdit={editTrip} onRemove={removeTrip} />
-              ))}
-            </ul>
-          </details>
-        )}
       </aside>
+    );
+  }
+
+  function goToCycle() {
+    if (isMobile) openDrawer("cycle");
+    else selectPanelTab("cycle");
+  }
+
+  function renderSummaryPanel() {
+    const current = app!;
+    return (
+      <section className="summary-panel">
+        <div className="summary-intro">
+          <p className="eyebrow">{t.eyebrow}</p>
+          <h2>{t.appName}</h2>
+          <p>{t.subtitle}</p>
+        </div>
+        <fieldset>
+          <legend>{t.showMonths}</legend>
+          <div className="segmented">
+            {([6, 12] as HorizonMonths[]).map((months) => (
+              <button aria-pressed={current.horizonMonths === months} className={current.horizonMonths === months ? "active" : ""} key={months} onClick={() => updateSettings({ horizonMonths: months })} type="button">
+                {months === 6 ? t.months6 : t.months12}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+        <fieldset className="layer-toggles">
+          <legend>{t.layers}</legend>
+          {(current.cycle ? (["period", "fertile", "ovulation", "trips"] as Layer[]) : (["trips"] as Layer[])).map((layer) => (
+            <label className={`toggle toggle-${layer}`} key={layer}>
+              <input checked={current.visibleLayers[layer]} onChange={() => toggleLayer(layer)} type="checkbox" />
+              <LayerIcon layer={layer} size={14} />
+              {layerName(locale, layer)}
+            </label>
+          ))}
+        </fieldset>
+        {forecast ? (
+          <>
+            <div className="summary-highlights">
+              <article><Droplets size={17} /><span>{t.nextPeriod}</span><strong>{nextPeriod ? formatRange(nextPeriod.periodStart, nextPeriod.periodEnd, locale) : "-"}</strong></article>
+              <article><Sparkles size={17} /><span>{t.nextOvulation}</span><strong>{nextOvulation ? formatDate(nextOvulation.start, locale) : "-"}</strong></article>
+              <article><Leaf size={17} /><span>{t.nextFertile}</span><strong>{nextFertile ? formatRange(nextFertile.start, nextFertile.end, locale) : "-"}</strong></article>
+            </div>
+            {validation?.atypicalCycle && <div className="warning" role="note"><Info size={18} /><p>{t.atypical}</p></div>}
+            <div className="disclaimer" role="note"><Info size={18} /><div><strong>{t.disclaimerTitle}</strong><p>{t.disclaimer}</p></div></div>
+          </>
+        ) : (
+          <div className="calendar-note" role="note"><Plane size={18} /><div><strong>{t.noCycleTitle}</strong><p>{t.noCycleText}</p><button className="cycle-action" onClick={goToCycle} type="button">{t.addCycleDetails}</button></div></div>
+        )}
+        {hasData && (
+          <div className="actions-panel">
+            <button type="button" onClick={() => setShowExport(true)}><Download size={16} />{t.export}</button>
+            <button type="button" onClick={downloadIcs}><CalendarPlus size={16} />{t.exportIcs}</button>
+            <button className="delete-button" type="button" onClick={() => setShowDelete(true)}><Trash2 size={16} />{t.delete}</button>
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  function renderPanelTabs(prefix: string) {
+    const labels: Record<PanelTab, string> = {
+      summary: t.manageSummaryTab,
+      trips: t.manageTripsTab,
+      cycle: t.manageCycleTab,
+    };
+    return (
+      <div aria-label={t.managePanelTitle} className="panel-tabs" role="tablist">
+        {(Object.keys(labels) as PanelTab[]).map((tab) => (
+          <button aria-controls={`${prefix}-panel-${tab}`} aria-selected={panelTab === tab} id={`${prefix}-tab-${tab}`} key={tab} onClick={() => selectPanelTab(tab)} role="tab" type="button">
+            {labels[tab]}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  function renderPanelContent(prefix: string) {
+    return (
+      <div aria-labelledby={`${prefix}-tab-${panelTab}`} className="panel-content" id={`${prefix}-panel-${panelTab}`} role="tabpanel">
+        {panelTab === "summary" && renderSummaryPanel()}
+        {panelTab === "trips" && renderTripPanel()}
+        {panelTab === "cycle" && renderCyclePanel()}
+      </div>
     );
   }
 
@@ -787,90 +955,27 @@ export default function CyclePlanner() {
           </select>
         </label>
       </header>
-      <section className="intro">
-        <p className="eyebrow">{t.eyebrow}</p>
-        <h1>{t.title}</h1>
-        <p>{t.subtitle}</p>
-      </section>
       <div className="workspace">
-        {!isMobile && <div className="sidebar desktop-sidebar">{renderCyclePanel()}{renderTripPanel()}</div>}
+        {!isMobile && (
+          <aside className="sidebar-panel desktop-sidebar">
+            {renderPanelTabs("desktop")}
+            {renderPanelContent("desktop")}
+          </aside>
+        )}
         <section className="results" aria-live="polite">
           <div className="result-toolbar">
-            <div>
-              <p className="eyebrow">{hasData ? t.saved : t.calendar}</p>
-              <h2>{app.cycle ? t.forecastTitle : t.plannerTitle}</h2>
-            </div>
-            <div className="toolbar-actions">
-              <button className="mobile-manage-button" onClick={() => openDrawer("trips")} type="button"><Settings2 size={16} />{t.managePlans}</button>
-              {hasData && <button type="button" onClick={() => setShowExport(true)}><Download size={16} />{t.export}</button>}
-              {hasData && <button className="delete-button" type="button" onClick={() => setShowDelete(true)}><Trash2 size={16} />{t.delete}</button>}
-            </div>
-          </div>
-          <div className="controls">
-            <fieldset>
-              <legend>{t.showMonths}</legend>
-              <div className="segmented">
-                {([6, 12] as HorizonMonths[]).map((months) => (
-                  <button aria-pressed={app.horizonMonths === months} className={app.horizonMonths === months ? "active" : ""} key={months} onClick={() => updateSettings({ horizonMonths: months })} type="button">
-                    {months === 6 ? t.months6 : t.months12}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-            <fieldset className="layer-toggles">
-              <legend>{t.layers}</legend>
-              {(app.cycle ? (["period", "fertile", "ovulation", "trips"] as Layer[]) : (["trips"] as Layer[])).map((layer) => (
-                <label className={`toggle toggle-${layer}`} key={layer}>
-                  <input checked={app.visibleLayers[layer]} onChange={() => toggleLayer(layer)} type="checkbox" />
-                  {layerName(locale, layer)}
-                </label>
-              ))}
-            </fieldset>
+            <h2>{t.calendar}</h2>
+            <button className="mobile-manage-button" onClick={() => openDrawer()} type="button" aria-label={t.managePlans}><Settings2 size={18} /><span>{t.managePlans}</span></button>
           </div>
           <div className="forecast-report" ref={reportRef}>
-            <div className="export-header">
-              <strong>{t.appName}</strong>
-              <span>{formatRange(calendarWindow.viewStart, calendarWindow.viewEnd, locale)}</span>
-            </div>
-            {forecast ? (
-              <>
-                <div className="highlights">
-                  {app.visibleLayers.period && <article><Droplets size={18} /><span>{t.nextPeriod}</span><strong>{nextPeriod ? formatRange(nextPeriod.periodStart, nextPeriod.periodEnd, locale) : "-"}</strong></article>}
-                  {app.visibleLayers.ovulation && <article><Sparkles size={18} /><span>{t.nextOvulation}</span><strong>{nextOvulation ? formatDate(nextOvulation.start, locale) : "-"}</strong></article>}
-                  {app.visibleLayers.fertile && <article><Leaf size={18} /><span>{t.nextFertile}</span><strong>{nextFertile ? formatRange(nextFertile.start, nextFertile.end, locale) : "-"}</strong></article>}
-                </div>
-                {validation?.atypicalCycle && <div className="warning" role="note"><Info size={18} /><p>{t.atypical}</p></div>}
-                <div className="disclaimer" role="note"><Info size={18} /><div><strong>{t.disclaimerTitle}</strong><p>{t.disclaimer}</p></div></div>
-              </>
-            ) : (
-              <div className="calendar-note" role="note"><Plane size={18} /><div><strong>{t.noCycleTitle}</strong><p>{t.noCycleText}</p><button className="mobile-cycle-action" onClick={() => openDrawer("cycle")} type="button">{t.addCycleDetails}</button></div></div>
-            )}
-            <div className="calendar-header">
-              <h3>{t.calendar}</h3>
-              <Legend locale={locale} layers={app.visibleLayers} hasCycle={!!app.cycle} />
-            </div>
+            <div aria-hidden="true" className="capture-header"><h2>{t.calendar}</h2></div>
             <div className="months">
               {calendarWindow.months.map((month) => (
-                <CalendarMonth key={month} month={month} predictions={predictions} trips={app.trips} layers={app.visibleLayers} locale={locale} />
+                <CalendarMonth key={month} month={month} predictions={predictions} trips={app.trips} layers={app.visibleLayers} locale={locale} today={today} isMobile={isMobile} selectedDate={selectedDate} onSelectDate={(date) => setSelectedDate((selected) => selected === date ? null : date)} />
               ))}
             </div>
-            {app.visibleLayers.trips && visibleTrips.length > 0 && (
-              <section className="export-trips">
-                <h3>{t.plannedTrips}</h3>
-                <ul>
-                  {visibleTrips.map((trip) => <li key={trip.id}><strong>{trip.name}</strong><span>{formatRange(trip.startDate, trip.endDate, locale)}</span></li>)}
-                </ul>
-              </section>
-            )}
-            {forecast && (
-              <section className="upcoming">
-                <h3>{t.upcoming}</h3>
-                {!app.visibleLayers.period ? <p>{t.noPeriodLayer}</p> : (
-                  <ol>{forecast.upcoming.map((prediction) => <li key={prediction.periodStart}><span>{formatDate(prediction.periodStart, locale, { month: "long", year: "numeric" })}</span><strong>{formatRange(prediction.periodStart, prediction.periodEnd, locale)}</strong></li>)}</ol>
-                )}
-              </section>
-            )}
-            <p className="export-footnote"><LockKeyhole size={14} />{forecast ? t.disclaimer : t.travelOnlyNote}</p>
+            <Legend locale={locale} layers={app.visibleLayers} hasCycle={!!app.cycle} />
+            <p className="calendar-footnote"><LockKeyhole size={14} />{t.calendarFootnote}</p>
           </div>
         </section>
       </div>
@@ -881,13 +986,8 @@ export default function CyclePlanner() {
               <h2 id="drawer-title">{t.managePanelTitle}</h2>
               <button aria-label={t.closePanel} onClick={() => setDrawerOpen(false)} ref={drawerCloseRef} type="button"><X size={19} /></button>
             </header>
-            <div aria-label={t.managePanelTitle} className="drawer-tabs" role="tablist">
-              <button aria-controls="drawer-trips" aria-selected={drawerTab === "trips"} id="drawer-tab-trips" onClick={() => setDrawerTab("trips")} role="tab" type="button">{t.manageTripsTab}</button>
-              <button aria-controls="drawer-cycle" aria-selected={drawerTab === "cycle"} id="drawer-tab-cycle" onClick={() => setDrawerTab("cycle")} role="tab" type="button">{t.manageCycleTab}</button>
-            </div>
-            <div aria-labelledby={`drawer-tab-${drawerTab}`} className="drawer-content" id={`drawer-${drawerTab}`} role="tabpanel">
-              {drawerTab === "trips" ? renderTripPanel() : renderCyclePanel()}
-            </div>
+            {renderPanelTabs("drawer")}
+            {renderPanelContent("drawer")}
           </section>
         </div>
       )}

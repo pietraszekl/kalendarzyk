@@ -3,7 +3,9 @@ import {
   addDays,
   createCalendarWindow,
   generateForecast,
+  generateIcsCalendar,
   isTripVisible,
+  layoutCalendarBars,
   layersForDate,
   migrateStoredState,
   packCalendarBarLanes,
@@ -244,5 +246,54 @@ describe("calendar bar layout", () => {
         endDate: "2026-07-03",
       }),
     ).toEqual([]);
+  });
+
+  it("gives forecast layers priority and reports trips hidden beyond four lanes", () => {
+    const layout = layoutCalendarBars("2026-06-01", [
+      { ...tripBar, id: "trip-a", label: "A", startDate: "2026-06-15", endDate: "2026-06-15" },
+      { ...tripBar, id: "trip-b", label: "B", startDate: "2026-06-15", endDate: "2026-06-15" },
+      { ...tripBar, id: "trip-c", label: "C", startDate: "2026-06-15", endDate: "2026-06-15" },
+      { id: "fertile", layer: "fertile", label: "Płodne", startDate: "2026-06-14", endDate: "2026-06-16" },
+      { id: "period", layer: "period", label: "Miesiączka", startDate: "2026-06-15", endDate: "2026-06-15" },
+      { id: "ovulation", layer: "ovulation", label: "Owulacja", startDate: "2026-06-15", endDate: "2026-06-15" },
+    ]);
+    const visible = layout.segments.filter((segment) => segment.showLabel);
+
+    expect(visible.map(({ id, lane }) => ({ id, lane }))).toEqual([
+      { id: "period", lane: 0 },
+      { id: "fertile", lane: 1 },
+      { id: "ovulation", lane: 2 },
+      { id: "trip-a", lane: 3 },
+    ]);
+    expect(layout.hiddenByDate["2026-06-15"].map((event) => event.id)).toEqual([
+      "trip-b",
+      "trip-c",
+    ]);
+  });
+});
+
+describe("generateIcsCalendar", () => {
+  it("produces a valid iCalendar with all-day events", () => {
+    const ics = generateIcsCalendar([
+      { uid: "trip-1@kalendarzyk", summary: "Wyjazdy: Urlop", startDate: "2026-06-10", endDate: "2026-06-14" },
+      { uid: "period-2026-06-01@kalendarzyk", summary: "Miesiączka", startDate: "2026-06-01", endDate: "2026-06-05" },
+    ]);
+    expect(ics).toContain("BEGIN:VCALENDAR");
+    expect(ics).toContain("END:VCALENDAR");
+    expect(ics).toContain("DTSTART;VALUE=DATE:20260610");
+    expect(ics).toContain("DTEND;VALUE=DATE:20260615");
+    expect(ics).toContain("SUMMARY:Wyjazdy: Urlop");
+    expect(ics).toContain("DTSTART;VALUE=DATE:20260601");
+    expect(ics).toContain("DTEND;VALUE=DATE:20260606");
+    expect(ics).toContain("SUMMARY:Miesiączka");
+    const eventCount = (ics.match(/BEGIN:VEVENT/g) ?? []).length;
+    expect(eventCount).toBe(2);
+  });
+
+  it("returns only the calendar wrapper when given no events", () => {
+    const ics = generateIcsCalendar([]);
+    expect(ics).toContain("BEGIN:VCALENDAR");
+    expect(ics).toContain("END:VCALENDAR");
+    expect(ics).not.toContain("BEGIN:VEVENT");
   });
 });
