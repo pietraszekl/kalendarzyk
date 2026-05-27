@@ -216,6 +216,8 @@ button:disabled {
   border-radius: 9px;
   color: var(--foreground);
   height: 47px;
+  max-width: 100%;
+  min-width: 0;
   padding: 0 13px;
   width: 100%;
 }
@@ -232,7 +234,19 @@ button:disabled {
   grid-template-columns: 1fr 1fr;
 }
 
+.two-inputs > *,
 .number-field {
+  min-width: 0;
+}
+
+.trip-date-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.number-field {
+  display: block;
   position: relative;
 }
 
@@ -528,6 +542,12 @@ button:disabled {
   color: var(--danger);
 }
 
+.toolbar-actions .mobile-manage-button,
+.mobile-cycle-action,
+.drawer-backdrop {
+  display: none;
+}
+
 .controls {
   align-items: end;
   display: flex;
@@ -757,20 +777,11 @@ legend {
   gap: 5px;
 }
 
-.legend-period svg {
-  color: var(--period);
-}
-
-.legend-fertile svg {
-  color: var(--fertile);
-}
-
-.legend-ovulation svg {
-  color: var(--ovulation);
-}
-
-.legend-trips svg {
-  color: var(--trips);
+.legend-bar {
+  border-radius: 10px;
+  display: block;
+  height: 8px;
+  width: 21px;
 }
 
 .months {
@@ -813,42 +824,78 @@ legend {
   visibility: hidden;
 }
 
-.day.is-fertile {
-  background: var(--fertile-soft);
-  border-bottom: 2px dotted var(--fertile);
+.calendar-weeks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.day.is-period {
+.calendar-week {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.calendar-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bar-lane {
+  display: grid;
+  gap: 2px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  height: 14px;
+}
+
+.calendar-bar {
+  align-items: center;
+  border-radius: 8px;
+  display: flex;
+  font-size: 0.58rem;
+  font-weight: 700;
+  height: 14px;
+  line-height: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 5px;
+}
+
+.calendar-bar > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-bar.continues-left {
+  border-bottom-left-radius: 2px;
+  border-top-left-radius: 2px;
+}
+
+.calendar-bar.continues-right {
+  border-bottom-right-radius: 2px;
+  border-top-right-radius: 2px;
+}
+
+.bar-period {
   background: var(--period-soft);
   color: #762c41;
-  font-weight: 600;
 }
 
-.day.is-ovulation {
-  border: 1.5px solid var(--ovulation);
+.bar-fertile {
+  background: var(--fertile-soft);
+  color: var(--fertile);
 }
 
-.day.is-ovulation i {
-  background: var(--ovulation);
-  border-radius: 50%;
-  bottom: 3px;
-  height: 3px;
-  position: absolute;
-  width: 3px;
+.bar-ovulation {
+  background: var(--ovulation-soft);
+  color: #704a23;
 }
 
-.day.is-trips {
-  box-shadow: inset 0 -3px 0 var(--trips);
-}
-
-.day.is-trips b {
-  background: var(--trips);
-  border-radius: 4px 4px 0 0;
-  height: 3px;
-  left: 5px;
-  position: absolute;
-  right: 5px;
-  top: 1px;
+.bar-trips {
+  background: var(--trips-soft);
+  color: var(--trips);
 }
 
 .export-trips {
@@ -991,6 +1038,10 @@ legend {
   flex-wrap: wrap;
 }
 
+.mobile-drawer {
+  display: none;
+}
+
 @media (max-width: 1100px) {
   .months,
   .upcoming ol {
@@ -1033,6 +1084,10 @@ legend {
     flex-direction: column;
   }
 
+  .desktop-sidebar {
+    display: none;
+  }
+
   .form-panel,
   .trip-panel,
   .results,
@@ -1062,12 +1117,122 @@ legend {
   }
 
   .toolbar-actions {
+    flex-wrap: wrap;
     width: 100%;
   }
 
   .toolbar-actions button {
     flex: 1;
     justify-content: center;
+  }
+
+  .toolbar-actions .mobile-manage-button {
+    flex-basis: 100%;
+    display: flex;
+    order: -1;
+    width: 100%;
+  }
+
+  .calendar-note .mobile-cycle-action {
+    background: transparent;
+    border: 1px solid #c8d6e5;
+    border-radius: 8px;
+    color: var(--trips);
+    display: inline-flex;
+    font-size: 0.79rem;
+    font-weight: 600;
+    height: 38px;
+    margin-top: 11px;
+    padding: 0 13px;
+  }
+
+  .forecast-report:not(.export-capture) .export-trips {
+    display: none;
+  }
+
+  .drawer-backdrop {
+    background: rgb(26 24 22 / 42%);
+    display: flex;
+    inset: 0;
+    position: fixed;
+    z-index: 20;
+  }
+
+  .mobile-drawer {
+    animation: drawer-in 180ms ease-out;
+    background: var(--background);
+    box-shadow: 16px 0 45px rgb(29 26 23 / 16%);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    max-width: min(92vw, 390px);
+    overflow: hidden;
+    width: 100%;
+  }
+
+  .drawer-header {
+    align-items: center;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex: 0 0 auto;
+    justify-content: space-between;
+    padding: 18px 18px 15px 20px;
+  }
+
+  .drawer-header h2 {
+    font-size: 1.1rem;
+    margin: 0;
+  }
+
+  .drawer-header button {
+    align-items: center;
+    background: var(--surface-muted);
+    border: 0;
+    border-radius: 9px;
+    color: var(--foreground);
+    display: flex;
+    height: 42px;
+    justify-content: center;
+    width: 42px;
+  }
+
+  .drawer-tabs {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex: 0 0 auto;
+    gap: 6px;
+    padding: 9px 16px 13px;
+  }
+
+  .drawer-tabs button {
+    background: var(--surface-muted);
+    border: 1px solid transparent;
+    border-radius: 9px;
+    color: var(--muted);
+    flex: 1;
+    font-size: 0.86rem;
+    font-weight: 600;
+    height: 43px;
+  }
+
+  .drawer-tabs button[aria-selected="true"] {
+    background: #e8f0ee;
+    border-color: #c8dad5;
+    color: var(--accent);
+  }
+
+  .drawer-content {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 14px;
+  }
+
+  .drawer-content .form-panel,
+  .drawer-content .trip-panel {
+    border-radius: 14px;
+    box-shadow: none;
   }
 
   .months,
@@ -1093,6 +1258,22 @@ legend {
 
   .modal-actions.delete-options {
     flex-direction: column;
+  }
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translateX(-18px);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-drawer {
+    animation: none;
   }
 }
 

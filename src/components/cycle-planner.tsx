@@ -11,12 +11,23 @@ import {
   LockKeyhole,
   Pencil,
   Plane,
+  Settings2,
   Sparkles,
   Trash2,
+  X,
 } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   AppState,
+  CalendarBarEvent,
+  CalendarBarSegment,
   CalendarWindow,
   CycleLayer,
   CyclePrediction,
@@ -33,7 +44,9 @@ import {
   isTripVisible,
   layersForDate,
   migrateStoredState,
+  packCalendarBarLanes,
   parseDateKey,
+  segmentCalendarBar,
   splitTrips,
   toDateKey,
   tripOverlapLayers,
@@ -46,6 +59,9 @@ import { copy, dateLocale, layerName } from "@/lib/i18n";
 const STORAGE_KEY = "kalendarzyk.settings.v2";
 const LEGACY_STORAGE_KEY = "kalendarzyk.settings.v1";
 const LOCALE_KEY = "kalendarzyk.locale";
+const MOBILE_QUERY = "(max-width: 820px)";
+
+type DrawerTab = "trips" | "cycle";
 
 interface CycleFormValues {
   lastPeriodStart: string;
@@ -85,6 +101,17 @@ function persistState(state: AppState) {
 
 function createTripId() {
   return globalThis.crypto?.randomUUID?.() ?? `trip-${Date.now()}`;
+}
+
+function subscribeToMobileViewport(callback: () => void) {
+  const media = window.matchMedia?.(MOBILE_QUERY);
+  if (!media) return () => undefined;
+  media.addEventListener("change", callback);
+  return () => media.removeEventListener("change", callback);
+}
+
+function getMobileViewportSnapshot() {
+  return window.matchMedia?.(MOBILE_QUERY).matches ?? false;
 }
 
 function formatDate(
@@ -158,7 +185,76 @@ function CalendarMonth({
   const cells = Array.from({ length: leadingDays + daysInMonth }, (_, index) =>
     index < leadingDays ? null : addDays(month, index - leadingDays),
   );
+  while (cells.length % 7 !== 0) cells.push(null);
+  const weeks = Array.from({ length: cells.length / 7 }, (_, index) =>
+    cells.slice(index * 7, index * 7 + 7),
+  );
   const title = formatDate(month, locale, { month: "long", year: "numeric" });
+  const cycleEvents: CalendarBarEvent[] = predictions.flatMap(
+    (prediction, index) => [
+      {
+        id: `period-${index}`,
+        layer: "period",
+        label: t.periodShort,
+        startDate: prediction.periodStart,
+        endDate: prediction.periodEnd,
+      },
+      {
+        id: `fertile-${index}`,
+        layer: "fertile",
+        label: t.fertileShort,
+        startDate: prediction.fertileStart,
+        endDate: prediction.fertileEnd,
+      },
+      {
+        id: `ovulation-${index}`,
+        layer: "ovulation",
+        label: t.ovulationShort,
+        startDate: prediction.ovulation,
+        endDate: prediction.ovulation,
+      },
+    ],
+  );
+  const cycleSegments = (["period", "fertile", "ovulation"] as CycleLayer[])
+    .filter((layer) => layers[layer])
+    .map((layer) => ({
+      layer,
+      segments: cycleEvents
+        .filter((event) => event.layer === layer)
+        .flatMap((event) => segmentCalendarBar(month, event)),
+    }));
+  const tripSegments = layers.trips
+    ? packCalendarBarLanes(
+        month,
+        trips.map((trip) => ({
+          id: `trip-${trip.id}`,
+          layer: "trips",
+          label: trip.name,
+          startDate: trip.startDate,
+          endDate: trip.endDate,
+        })),
+      )
+    : [];
+
+  function renderSegment(segment: CalendarBarSegment) {
+    const accessibleLabel =
+      segment.layer === "trips"
+        ? `${t.trips}: ${segment.label}`
+        : layerName(locale, segment.layer);
+    return (
+      <span
+        aria-label={`${accessibleLabel}: ${formatRange(segment.startDate, segment.endDate, locale)}`}
+        className={`calendar-bar bar-${segment.layer} ${segment.startsRange ? "starts-range" : "continues-left"} ${segment.endsRange ? "ends-range" : "continues-right"}`}
+        data-layer={segment.layer}
+        key={`${segment.id}-${segment.week}-${segment.column}`}
+        style={{
+          gridColumn: `${segment.column} / span ${segment.span}`,
+        }}
+      >
+        {segment.showLabel && <span>{segment.label}</span>}
+      </span>
+    );
+  }
 
   return (
     <section className="month-card" aria-label={title}>
@@ -168,36 +264,57 @@ function CalendarMonth({
           <span key={day}>{day}</span>
         ))}
       </div>
-      <div className="calendar-grid">
-        {cells.map((value, index) => {
-          if (!value) return <span className="day blank" key={`blank-${index}`} />;
-          const cycleLayers = layersForDate(value, predictions).filter(
-            (layer) => layers[layer],
-          );
-          const matchingTrips = layers.trips ? tripsForDate(value, trips) : [];
-          const active: Layer[] = matchingTrips.length
-            ? [...cycleLayers, "trips"]
-            : cycleLayers;
-          const description = [
-            ...cycleLayers.map((layer) => layerName(locale, layer)),
-            ...matchingTrips.map((trip) => `${t.trips}: ${trip.name}`),
-          ].join(", ");
-          return (
-            <span
-              aria-label={
-                description
-                  ? `${formatDate(value, locale)}: ${description}`
-                  : formatDate(value, locale)
-              }
-              className={`day ${active.map((layer) => `is-${layer}`).join(" ")}`}
-              key={value}
-            >
-              {parseDateKey(value).getDate()}
-              {cycleLayers.includes("ovulation") && <i aria-hidden="true" />}
-              {matchingTrips.length > 0 && <b aria-hidden="true" />}
-            </span>
-          );
-        })}
+      <div className="calendar-weeks">
+        {weeks.map((week, weekIndex) => (
+          <div className="calendar-week" key={`week-${weekIndex}`}>
+            <div className="calendar-grid">
+              {week.map((value, index) => {
+                if (!value) return <span className="day blank" key={`blank-${weekIndex}-${index}`} />;
+                const cycleLayers = layersForDate(value, predictions).filter(
+                  (layer) => layers[layer],
+                );
+                const matchingTrips = layers.trips ? tripsForDate(value, trips) : [];
+                const description = [
+                  ...cycleLayers.map((layer) => layerName(locale, layer)),
+                  ...matchingTrips.map((trip) => `${t.trips}: ${trip.name}`),
+                ].join(", ");
+                return (
+                  <span
+                    aria-label={
+                      description
+                        ? `${formatDate(value, locale)}: ${description}`
+                        : formatDate(value, locale)
+                    }
+                    className="day"
+                    key={value}
+                  >
+                    {parseDateKey(value).getDate()}
+                  </span>
+                );
+              })}
+            </div>
+            <div className="calendar-bars">
+              {cycleSegments.map(({ layer, segments }) => {
+                const weekSegments = segments.filter((segment) => segment.week === weekIndex);
+                return weekSegments.length > 0 ? (
+                  <div className={`bar-lane lane-${layer}`} key={layer}>
+                    {weekSegments.map(renderSegment)}
+                  </div>
+                ) : null;
+              })}
+              {Array.from(new Set(tripSegments.map((segment) => segment.lane))).map((lane) => {
+                const weekSegments = tripSegments.filter(
+                  (segment) => segment.week === weekIndex && segment.lane === lane,
+                );
+                return weekSegments.length > 0 ? (
+                  <div className="bar-lane lane-trips" key={`trips-${lane}`}>
+                    {weekSegments.map(renderSegment)}
+                  </div>
+                ) : null;
+              })}
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -221,7 +338,7 @@ function Legend({
         .filter((layer) => layers[layer])
         .map((layer) => (
           <li className={`legend-${layer}`} key={layer}>
-            <LayerIcon layer={layer} />
+            <span aria-hidden="true" className={`legend-bar bar-${layer}`} />
             {layerName(locale, layer)}
           </li>
         ))}
@@ -289,7 +406,18 @@ export default function CyclePlanner() {
   const [showDelete, setShowDelete] = useState(false);
   const [exportError, setExportError] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerTab, setDrawerTab] = useState<DrawerTab>("trips");
   const reportRef = useRef<HTMLDivElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
+  const drawerCloseRef = useRef<HTMLButtonElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const tripEndRef = useRef<HTMLInputElement>(null);
+  const isMobile = useSyncExternalStore(
+    subscribeToMobileViewport,
+    getMobileViewportSnapshot,
+    () => false,
+  );
 
   useEffect(() => {
     const preferred = localStorage.getItem(LOCALE_KEY);
@@ -332,7 +460,44 @@ export default function CyclePlanner() {
     if (ready) document.documentElement.lang = locale;
   }, [locale, ready]);
 
-  const window = useMemo(
+  useEffect(() => {
+    if (!drawerOpen || !isMobile) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    drawerCloseRef.current?.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setDrawerOpen(false);
+        return;
+      }
+      if (event.key !== "Tab" || !drawerRef.current) return;
+      const focusable = Array.from(
+        drawerRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), summary, [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+      previousFocusRef.current?.focus();
+    };
+  }, [drawerOpen, isMobile]);
+
+  const calendarWindow = useMemo(
     () => createCalendarWindow(today, app?.horizonMonths ?? 6),
     [app?.horizonMonths, today],
   );
@@ -347,7 +512,7 @@ export default function CyclePlanner() {
   const validation = app?.cycle ? validateCycleInput(app.cycle, today) : null;
   const categorizedTrips = splitTrips(app?.trips ?? [], today);
   const visibleTrips = (app?.trips ?? []).filter((trip) =>
-    isTripVisible(trip, window),
+    isTripVisible(trip, calendarWindow),
   );
   const hasData = !!app?.cycle || (app?.trips.length ?? 0) > 0;
 
@@ -365,6 +530,12 @@ export default function CyclePlanner() {
     updateApp((previous) => ({ ...previous, locale: nextLocale }));
   }
 
+  function openDrawer(tab: DrawerTab) {
+    previousFocusRef.current = document.activeElement as HTMLElement | null;
+    setDrawerTab(tab);
+    setDrawerOpen(true);
+  }
+
   function submitCycle(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const cycle = {
@@ -376,6 +547,7 @@ export default function CyclePlanner() {
     setCycleErrors(result.errors);
     if (result.errors.length) return;
     updateApp((previous) => ({ ...previous, cycle }));
+    if (isMobile) setDrawerOpen(false);
   }
 
   function submitTrip(event: FormEvent<HTMLFormElement>) {
@@ -398,6 +570,7 @@ export default function CyclePlanner() {
     setTripForm(EMPTY_TRIP_FORM);
     setEditingTripId(null);
     setTripErrors([]);
+    if (isMobile) setDrawerOpen(false);
   }
 
   function editTrip(trip: Trip) {
@@ -460,6 +633,7 @@ export default function CyclePlanner() {
     if (!reportRef.current) return;
     setExporting(true);
     setExportError(false);
+    reportRef.current.classList.add("export-capture");
     try {
       const dataUrl = await toPng(reportRef.current, {
         backgroundColor: "#fbf8f5",
@@ -474,6 +648,7 @@ export default function CyclePlanner() {
     } catch {
       setExportError(true);
     } finally {
+      reportRef.current?.classList.remove("export-capture");
       setExporting(false);
     }
   }
@@ -483,6 +658,117 @@ export default function CyclePlanner() {
   const nextPeriod = forecast?.upcoming[0] ?? null;
   const nextOvulation = forecast ? nextEvent(forecast, today, "ovulation") : null;
   const nextFertile = forecast ? nextEvent(forecast, today, "fertile") : null;
+
+  function renderCyclePanel() {
+    return (
+      <aside className="form-panel">
+        <div className="section-heading">
+          <h2>{t.formTitle}</h2>
+          <p>{t.formIntro}</p>
+        </div>
+        <form onSubmit={submitCycle} noValidate>
+          <label>
+            {t.lastPeriod}
+            <input type="date" max={today} value={cycleForm.lastPeriodStart} onChange={(event) => setCycleForm({ ...cycleForm, lastPeriodStart: event.target.value })} />
+          </label>
+          <div className="two-inputs number-inputs">
+            <label>
+              {t.cycleLength}
+              <span className="number-field">
+                <input type="number" min={15} max={90} value={cycleForm.cycleLengthDays} onChange={(event) => setCycleForm({ ...cycleForm, cycleLengthDays: event.target.value })} />
+                <small>{t.days}</small>
+              </span>
+            </label>
+            <label>
+              {t.periodLength}
+              <span className="number-field">
+                <input type="number" min={1} max={14} value={cycleForm.periodLengthDays} onChange={(event) => setCycleForm({ ...cycleForm, periodLengthDays: event.target.value })} />
+                <small>{t.days}</small>
+              </span>
+            </label>
+          </div>
+          {cycleErrors.length > 0 && (
+            <div className="form-errors" role="alert">
+              {cycleErrors.map((error) => <p key={error}>{t.validation[error as keyof typeof t.validation]}</p>)}
+            </div>
+          )}
+          <button className="primary-button" type="submit">{forecast ? t.update : t.calculate}</button>
+        </form>
+        <p className="privacy-note"><LockKeyhole size={16} />{t.privacy}</p>
+      </aside>
+    );
+  }
+
+  function renderTripPanel() {
+    return (
+      <aside className="trip-panel">
+        <div className="section-heading">
+          <h2>{t.tripSection}</h2>
+          <p>{t.tripSectionIntro}</p>
+        </div>
+        <form className="trip-form" onSubmit={submitTrip} noValidate>
+          <label>
+            {t.tripName}
+            <input placeholder={t.tripNamePlaceholder} value={tripForm.name} onChange={(event) => setTripForm({ ...tripForm, name: event.target.value })} />
+          </label>
+          <div className="trip-date-inputs">
+            <label>
+              {t.tripStart}
+              <input
+                type="date"
+                min={editingTripId ? undefined : today}
+                value={tripForm.startDate}
+                onChange={(event) => {
+                  const startDate = event.target.value;
+                  setTripForm({ ...tripForm, startDate });
+                  if (startDate) tripEndRef.current?.focus();
+                }}
+              />
+            </label>
+            <label>
+              {t.tripEnd}
+              <input ref={tripEndRef} type="date" min={tripForm.startDate || today} value={tripForm.endDate} onChange={(event) => setTripForm({ ...tripForm, endDate: event.target.value })} />
+            </label>
+          </div>
+          {tripErrors.length > 0 && (
+            <div className="form-errors" role="alert">
+              {tripErrors.map((error) => <p key={error}>{t.validation[error as keyof typeof t.validation]}</p>)}
+            </div>
+          )}
+          <div className="trip-form-actions">
+            <button className="primary-button" type="submit">{editingTripId ? t.saveTrip : t.addTrip}</button>
+            {editingTripId && (
+              <button className="secondary-button" type="button" onClick={() => { setEditingTripId(null); setTripForm(EMPTY_TRIP_FORM); setTripErrors([]); }}>
+                {t.stopEditing}
+              </button>
+            )}
+          </div>
+        </form>
+        <section className="trip-list-section">
+          <h3>{t.plannedTrips}</h3>
+          {categorizedTrips.planned.length === 0 ? (
+            <p className="no-trips">{t.noTrips}</p>
+          ) : (
+            <ul className="trip-list">
+              {categorizedTrips.planned.map((trip) => (
+                <TripItem key={trip.id} trip={trip} locale={locale} window={calendarWindow} overlap={forecast ? tripOverlapLayers(trip, predictions) : []} onEdit={editTrip} onRemove={removeTrip} />
+              ))}
+            </ul>
+          )}
+        </section>
+        {categorizedTrips.past.length > 0 && (
+          <details className="past-trips">
+            <summary><ChevronDown size={15} />{t.pastTrips} ({categorizedTrips.past.length})</summary>
+            <ul className="trip-list">
+              {categorizedTrips.past.map((trip) => (
+                <TripItem key={trip.id} trip={trip} locale={locale} window={calendarWindow} overlap={forecast ? tripOverlapLayers(trip, predictions) : []} onEdit={editTrip} onRemove={removeTrip} />
+              ))}
+            </ul>
+          </details>
+        )}
+      </aside>
+    );
+  }
 
   return (
     <main className="planner">
@@ -507,100 +793,7 @@ export default function CyclePlanner() {
         <p>{t.subtitle}</p>
       </section>
       <div className="workspace">
-        <div className="sidebar">
-          <aside className="form-panel">
-            <div className="section-heading">
-              <h2>{t.formTitle}</h2>
-              <p>{t.formIntro}</p>
-            </div>
-            <form onSubmit={submitCycle} noValidate>
-              <label>
-                {t.lastPeriod}
-                <input type="date" max={today} value={cycleForm.lastPeriodStart} onChange={(event) => setCycleForm({ ...cycleForm, lastPeriodStart: event.target.value })} />
-              </label>
-              <div className="two-inputs">
-                <label>
-                  {t.cycleLength}
-                  <span className="number-field">
-                    <input type="number" min={15} max={90} value={cycleForm.cycleLengthDays} onChange={(event) => setCycleForm({ ...cycleForm, cycleLengthDays: event.target.value })} />
-                    <small>{t.days}</small>
-                  </span>
-                </label>
-                <label>
-                  {t.periodLength}
-                  <span className="number-field">
-                    <input type="number" min={1} max={14} value={cycleForm.periodLengthDays} onChange={(event) => setCycleForm({ ...cycleForm, periodLengthDays: event.target.value })} />
-                    <small>{t.days}</small>
-                  </span>
-                </label>
-              </div>
-              {cycleErrors.length > 0 && (
-                <div className="form-errors" role="alert">
-                  {cycleErrors.map((error) => <p key={error}>{t.validation[error as keyof typeof t.validation]}</p>)}
-                </div>
-              )}
-              <button className="primary-button" type="submit">{app.cycle ? t.update : t.calculate}</button>
-            </form>
-            <p className="privacy-note"><LockKeyhole size={16} />{t.privacy}</p>
-          </aside>
-          <aside className="trip-panel">
-            <div className="section-heading">
-              <h2>{t.tripSection}</h2>
-              <p>{t.tripSectionIntro}</p>
-            </div>
-            <form className="trip-form" onSubmit={submitTrip} noValidate>
-              <label>
-                {t.tripName}
-                <input placeholder={t.tripNamePlaceholder} value={tripForm.name} onChange={(event) => setTripForm({ ...tripForm, name: event.target.value })} />
-              </label>
-              <div className="two-inputs">
-                <label>
-                  {t.tripStart}
-                  <input type="date" min={editingTripId ? undefined : today} value={tripForm.startDate} onChange={(event) => setTripForm({ ...tripForm, startDate: event.target.value })} />
-                </label>
-                <label>
-                  {t.tripEnd}
-                  <input type="date" min={tripForm.startDate || today} value={tripForm.endDate} onChange={(event) => setTripForm({ ...tripForm, endDate: event.target.value })} />
-                </label>
-              </div>
-              {tripErrors.length > 0 && (
-                <div className="form-errors" role="alert">
-                  {tripErrors.map((error) => <p key={error}>{t.validation[error as keyof typeof t.validation]}</p>)}
-                </div>
-              )}
-              <div className="trip-form-actions">
-                <button className="primary-button" type="submit">{editingTripId ? t.saveTrip : t.addTrip}</button>
-                {editingTripId && (
-                  <button className="secondary-button" type="button" onClick={() => { setEditingTripId(null); setTripForm(EMPTY_TRIP_FORM); setTripErrors([]); }}>
-                    {t.stopEditing}
-                  </button>
-                )}
-              </div>
-            </form>
-            <section className="trip-list-section">
-              <h3>{t.plannedTrips}</h3>
-              {categorizedTrips.planned.length === 0 ? (
-                <p className="no-trips">{t.noTrips}</p>
-              ) : (
-                <ul className="trip-list">
-                  {categorizedTrips.planned.map((trip) => (
-                    <TripItem key={trip.id} trip={trip} locale={locale} window={window} overlap={forecast ? tripOverlapLayers(trip, predictions) : []} onEdit={editTrip} onRemove={removeTrip} />
-                  ))}
-                </ul>
-              )}
-            </section>
-            {categorizedTrips.past.length > 0 && (
-              <details className="past-trips">
-                <summary><ChevronDown size={15} />{t.pastTrips} ({categorizedTrips.past.length})</summary>
-                <ul className="trip-list">
-                  {categorizedTrips.past.map((trip) => (
-                    <TripItem key={trip.id} trip={trip} locale={locale} window={window} overlap={forecast ? tripOverlapLayers(trip, predictions) : []} onEdit={editTrip} onRemove={removeTrip} />
-                  ))}
-                </ul>
-              </details>
-            )}
-          </aside>
-        </div>
+        {!isMobile && <div className="sidebar desktop-sidebar">{renderCyclePanel()}{renderTripPanel()}</div>}
         <section className="results" aria-live="polite">
           <div className="result-toolbar">
             <div>
@@ -608,6 +801,7 @@ export default function CyclePlanner() {
               <h2>{app.cycle ? t.forecastTitle : t.plannerTitle}</h2>
             </div>
             <div className="toolbar-actions">
+              <button className="mobile-manage-button" onClick={() => openDrawer("trips")} type="button"><Settings2 size={16} />{t.managePlans}</button>
               {hasData && <button type="button" onClick={() => setShowExport(true)}><Download size={16} />{t.export}</button>}
               {hasData && <button className="delete-button" type="button" onClick={() => setShowDelete(true)}><Trash2 size={16} />{t.delete}</button>}
             </div>
@@ -636,7 +830,7 @@ export default function CyclePlanner() {
           <div className="forecast-report" ref={reportRef}>
             <div className="export-header">
               <strong>{t.appName}</strong>
-              <span>{formatRange(window.viewStart, window.viewEnd, locale)}</span>
+              <span>{formatRange(calendarWindow.viewStart, calendarWindow.viewEnd, locale)}</span>
             </div>
             {forecast ? (
               <>
@@ -649,14 +843,14 @@ export default function CyclePlanner() {
                 <div className="disclaimer" role="note"><Info size={18} /><div><strong>{t.disclaimerTitle}</strong><p>{t.disclaimer}</p></div></div>
               </>
             ) : (
-              <div className="calendar-note" role="note"><Plane size={18} /><div><strong>{t.noCycleTitle}</strong><p>{t.noCycleText}</p></div></div>
+              <div className="calendar-note" role="note"><Plane size={18} /><div><strong>{t.noCycleTitle}</strong><p>{t.noCycleText}</p><button className="mobile-cycle-action" onClick={() => openDrawer("cycle")} type="button">{t.addCycleDetails}</button></div></div>
             )}
             <div className="calendar-header">
               <h3>{t.calendar}</h3>
               <Legend locale={locale} layers={app.visibleLayers} hasCycle={!!app.cycle} />
             </div>
             <div className="months">
-              {window.months.map((month) => (
+              {calendarWindow.months.map((month) => (
                 <CalendarMonth key={month} month={month} predictions={predictions} trips={app.trips} layers={app.visibleLayers} locale={locale} />
               ))}
             </div>
@@ -680,6 +874,23 @@ export default function CyclePlanner() {
           </div>
         </section>
       </div>
+      {isMobile && drawerOpen && (
+        <div className="drawer-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setDrawerOpen(false); }}>
+          <section aria-labelledby="drawer-title" aria-modal="true" className="mobile-drawer" ref={drawerRef} role="dialog">
+            <header className="drawer-header">
+              <h2 id="drawer-title">{t.managePanelTitle}</h2>
+              <button aria-label={t.closePanel} onClick={() => setDrawerOpen(false)} ref={drawerCloseRef} type="button"><X size={19} /></button>
+            </header>
+            <div aria-label={t.managePanelTitle} className="drawer-tabs" role="tablist">
+              <button aria-controls="drawer-trips" aria-selected={drawerTab === "trips"} id="drawer-tab-trips" onClick={() => setDrawerTab("trips")} role="tab" type="button">{t.manageTripsTab}</button>
+              <button aria-controls="drawer-cycle" aria-selected={drawerTab === "cycle"} id="drawer-tab-cycle" onClick={() => setDrawerTab("cycle")} role="tab" type="button">{t.manageCycleTab}</button>
+            </div>
+            <div aria-labelledby={`drawer-tab-${drawerTab}`} className="drawer-content" id={`drawer-${drawerTab}`} role="tabpanel">
+              {drawerTab === "trips" ? renderTripPanel() : renderCyclePanel()}
+            </div>
+          </section>
+        </div>
+      )}
       {showExport && (
         <div className="modal-backdrop">
           <section aria-labelledby="export-title" aria-modal="true" className="modal" role="dialog">

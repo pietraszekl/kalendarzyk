@@ -49,6 +49,24 @@ export interface CalendarWindow {
   months: string[];
 }
 
+export interface CalendarBarEvent {
+  id: string;
+  layer: Layer;
+  label: string;
+  startDate: string;
+  endDate: string;
+}
+
+export interface CalendarBarSegment extends CalendarBarEvent {
+  week: number;
+  column: number;
+  span: number;
+  lane: number;
+  showLabel: boolean;
+  startsRange: boolean;
+  endsRange: boolean;
+}
+
 export interface Forecast extends CalendarWindow {
   predictions: CyclePrediction[];
   upcoming: CyclePrediction[];
@@ -136,6 +154,13 @@ export function createCalendarWindow(
 
 export function isInRange(value: string, start: string, end: string): boolean {
   return value >= start && value <= end;
+}
+
+function daysBetween(start: string, end: string): number {
+  return Math.round(
+    (parseDateKey(end).getTime() - parseDateKey(start).getTime()) /
+      (24 * 60 * 60 * 1000),
+  );
 }
 
 function rangesIntersect(
@@ -275,6 +300,84 @@ export function layersForDate(
 
 export function tripsForDate(value: string, trips: Trip[]): Trip[] {
   return trips.filter((trip) => isInRange(value, trip.startDate, trip.endDate));
+}
+
+export function segmentCalendarBar(
+  month: string,
+  event: CalendarBarEvent,
+  lane = 0,
+): CalendarBarSegment[] {
+  const monthStart = startOfMonth(month);
+  const monthEnd = endOfMonth(month);
+  if (!rangesIntersect(event.startDate, event.endDate, monthStart, monthEnd)) {
+    return [];
+  }
+
+  const visibleStart =
+    event.startDate > monthStart ? event.startDate : monthStart;
+  const visibleEnd = event.endDate < monthEnd ? event.endDate : monthEnd;
+  const leadingDays = (parseDateKey(monthStart).getDay() + 6) % 7;
+  const firstCell = leadingDays + daysBetween(monthStart, visibleStart);
+  const lastCell = leadingDays + daysBetween(monthStart, visibleEnd);
+  const segments: CalendarBarSegment[] = [];
+
+  for (
+    let startCell = firstCell;
+    startCell <= lastCell;
+    startCell = Math.floor(startCell / 7) * 7 + 7
+  ) {
+    const endCell = Math.min(lastCell, Math.floor(startCell / 7) * 7 + 6);
+    const segmentStart = addDays(
+      monthStart,
+      startCell - leadingDays,
+    );
+    const segmentEnd = addDays(monthStart, endCell - leadingDays);
+    segments.push({
+      ...event,
+      week: Math.floor(startCell / 7),
+      column: (startCell % 7) + 1,
+      span: endCell - startCell + 1,
+      lane,
+      showLabel: startCell === firstCell,
+      startsRange: segmentStart === event.startDate,
+      endsRange: segmentEnd === event.endDate,
+    });
+  }
+
+  return segments;
+}
+
+export function packCalendarBarLanes(
+  month: string,
+  events: CalendarBarEvent[],
+): CalendarBarSegment[] {
+  const monthStart = startOfMonth(month);
+  const monthEnd = endOfMonth(month);
+  const laneEnds: string[] = [];
+  const visibleEvents = [...events]
+    .filter((event) =>
+      rangesIntersect(event.startDate, event.endDate, monthStart, monthEnd),
+    )
+    .sort(
+      (first, second) =>
+        first.startDate.localeCompare(second.startDate) ||
+        first.endDate.localeCompare(second.endDate) ||
+        first.id.localeCompare(second.id),
+    );
+
+  return visibleEvents.flatMap((event) => {
+    const clippedStart =
+      event.startDate > monthStart ? event.startDate : monthStart;
+    const clippedEnd = event.endDate < monthEnd ? event.endDate : monthEnd;
+    let lane = laneEnds.findIndex((end) => end < clippedStart);
+    if (lane === -1) {
+      lane = laneEnds.length;
+      laneEnds.push(clippedEnd);
+    } else {
+      laneEnds[lane] = clippedEnd;
+    }
+    return segmentCalendarBar(month, event, lane);
+  });
 }
 
 export function sortTrips(trips: Trip[]): Trip[] {

@@ -6,6 +6,8 @@ import {
   isTripVisible,
   layersForDate,
   migrateStoredState,
+  packCalendarBarLanes,
+  segmentCalendarBar,
   splitTrips,
   tripOverlapLayers,
   validateCycleInput,
@@ -155,5 +157,92 @@ describe("trip planning", () => {
         trips: true,
       },
     });
+  });
+});
+
+describe("calendar bar layout", () => {
+  const tripBar = {
+    id: "holiday",
+    layer: "trips" as const,
+    label: "Urlop",
+    startDate: "2026-06-04",
+    endDate: "2026-06-10",
+  };
+
+  it("creates a one-day bar and splits a multi-day range between weeks", () => {
+    expect(
+      segmentCalendarBar("2026-06-01", {
+        ...tripBar,
+        startDate: "2026-06-03",
+        endDate: "2026-06-03",
+      }),
+    ).toMatchObject([
+      {
+        week: 0,
+        column: 3,
+        span: 1,
+        showLabel: true,
+        startsRange: true,
+        endsRange: true,
+      },
+    ]);
+    expect(segmentCalendarBar("2026-06-01", tripBar)).toMatchObject([
+      { week: 0, column: 4, span: 4, showLabel: true, endsRange: false },
+      { week: 1, column: 1, span: 3, showLabel: false, startsRange: false },
+    ]);
+  });
+
+  it("clips ranges to the month across a year boundary", () => {
+    expect(
+      segmentCalendarBar("2027-01-01", {
+        ...tripBar,
+        startDate: "2026-12-29",
+        endDate: "2027-01-03",
+      }),
+    ).toMatchObject([
+      {
+        week: 0,
+        column: 5,
+        span: 3,
+        showLabel: true,
+        startsRange: false,
+        endsRange: true,
+      },
+    ]);
+  });
+
+  it("packs intersecting trips into separate lanes and reuses free lanes", () => {
+    const segments = packCalendarBarLanes("2026-06-01", [
+      tripBar,
+      {
+        ...tripBar,
+        id: "overlap",
+        startDate: "2026-06-09",
+        endDate: "2026-06-11",
+      },
+      {
+        ...tripBar,
+        id: "later",
+        startDate: "2026-06-12",
+        endDate: "2026-06-13",
+      },
+    ]);
+    const firstSegments = segments.filter((segment) => segment.showLabel);
+
+    expect(firstSegments.map(({ id, lane }) => ({ id, lane }))).toEqual([
+      { id: "holiday", lane: 0 },
+      { id: "overlap", lane: 1 },
+      { id: "later", lane: 0 },
+    ]);
+  });
+
+  it("returns no segments for an event outside the displayed month", () => {
+    expect(
+      segmentCalendarBar("2026-06-01", {
+        ...tripBar,
+        startDate: "2026-07-01",
+        endDate: "2026-07-03",
+      }),
+    ).toEqual([]);
   });
 });
