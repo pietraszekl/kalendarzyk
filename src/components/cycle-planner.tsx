@@ -1321,7 +1321,7 @@ export default function CyclePlanner() {
             <p className="no-trips">{t.noPeriods}</p>
           )}
         </section>
-        <p className="privacy-note"><LockKeyhole size={15} />{t.privacy}</p>
+
       </aside>
     );
   }
@@ -1584,7 +1584,8 @@ export default function CyclePlanner() {
               ))}
             </div>
             <Legend locale={locale} layers={app.visibleLayers} hasCycle={hasCycleData} hasHolidays={!!app.holidayCountry} />
-            <p className="calendar-footnote"><LockKeyhole size={14} />{t.calendarFootnote}</p>
+
+             <p className="privacy-note"><LockKeyhole size={15} />{t.privacy} {t.calendarFootnote}</p>
           </div>
         </section>
       </div>

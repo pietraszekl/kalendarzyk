@@ -19,7 +19,7 @@ export const copy = {
     periodStart: "Pierwszy dzień miesiączki",
     cycleLength: "Typowa długość cyklu",
     periodLength: "Długość krwawienia",
-    defaultPeriodLength: "Typowa długość krwawienia",
+    defaultPeriodLength: "Typowa długość menstruacji",
     entryPeriodLength: "Długość tej miesiączki",
     days: "dni",
     calculate: "Pokaż prognozę",
