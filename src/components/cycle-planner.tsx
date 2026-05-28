@@ -1441,6 +1441,18 @@ export default function CyclePlanner() {
           <h2>{t.appName}</h2>
           <p>{t.subtitle}</p>
         </div>
+        {!forecast && (
+          <div className="calendar-note" role="note">
+            <Droplets size={18} />
+            <div>
+              <strong>{t.noCycleTitle}</strong>
+              <p>{t.noCycleText}</p>
+              <button className="cycle-action" onClick={goToCycle} type="button">
+                {t.addCycleDetails}
+              </button>
+            </div>
+          </div>
+        )}
         <fieldset>
           <legend>{t.showMonths}</legend>
           <div className="segmented horizon-picker">
@@ -1495,13 +1507,11 @@ export default function CyclePlanner() {
             <p>{t.holidayDisclaimer}</p>
           </div>
         </fieldset>
-        {forecast ? (
-          <>
-            {currentCycleLength !== null && (currentCycleLength < 21 || currentCycleLength > 35) && <div className="warning" role="note"><Info size={18} /><p>{t.atypical}</p></div>}
-
-          </>
-        ) : (
-          <div className="calendar-note" role="note"><Plane size={18} /><div><strong>{t.noCycleTitle}</strong><p>{t.noCycleText}</p><button className="cycle-action" onClick={goToCycle} type="button">{t.addCycleDetails}</button></div></div>
+        {forecast && currentCycleLength !== null && (currentCycleLength < 21 || currentCycleLength > 35) && (
+          <div className="warning" role="note">
+            <Info size={18} />
+            <p>{t.atypical}</p>
+          </div>
         )}
         {hasData && (
           <div className="actions-panel">
