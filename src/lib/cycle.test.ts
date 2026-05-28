@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   addDays,
   createCalendarWindow,
+  effectiveCycleLength,
   generateForecast,
   generateIcsCalendar,
   isTripVisible,
@@ -12,11 +13,27 @@ import {
   segmentCalendarBar,
   splitTrips,
   tripOverlapLayers,
-  validateCycleInput,
+  tripReadiness,
+  validateCycleSettings,
+  validatePeriodEntry,
   validateTrip,
 } from "@/lib/cycle";
+import { holidayCountries, holidayEventsForWindow } from "@/lib/holidays";
 
-const input = {
+const settings = {
+  cycleLengthDays: 28,
+  periodLengthDays: 5,
+};
+
+const entries = [
+  {
+    id: "period-2026-05-04",
+    startDate: "2026-05-04",
+    periodLengthDays: 5,
+  },
+];
+
+const legacyInput = {
   lastPeriodStart: "2026-05-04",
   cycleLengthDays: 28,
   periodLengthDays: 5,
@@ -28,7 +45,7 @@ describe("cycle forecasting", () => {
   });
 
   it("creates bleeding, ovulation and fertile ranges from the cycle model", () => {
-    const forecast = generateForecast(input, "2026-05-27", 4);
+    const forecast = generateForecast(settings, entries, "2026-05-27", 4);
     const juneCycle = forecast.predictions.find(
       (prediction) => prediction.periodStart === "2026-06-01",
     );
@@ -47,10 +64,10 @@ describe("cycle forecasting", () => {
   });
 
   it("returns the configured month horizon and upcoming period list", () => {
-    const compact = generateForecast(input, "2026-05-27", 2);
-    const short = generateForecast(input, "2026-05-27", 4);
-    const medium = generateForecast(input, "2026-05-27", 8);
-    const long = generateForecast(input, "2026-05-27", 12);
+    const compact = generateForecast(settings, entries, "2026-05-27", 2);
+    const short = generateForecast(settings, entries, "2026-05-27", 4);
+    const medium = generateForecast(settings, entries, "2026-05-27", 8);
+    const long = generateForecast(settings, entries, "2026-05-27", 12);
 
     expect(compact.months).toHaveLength(2);
     expect(compact.viewEnd).toBe("2026-06-30");
@@ -65,37 +82,78 @@ describe("cycle forecasting", () => {
 
   it("does not call a period starting today the next predicted period", () => {
     const forecast = generateForecast(
-      { ...input, lastPeriodStart: "2026-05-27" },
+      settings,
+      [{ ...entries[0], startDate: "2026-05-27" }],
       "2026-05-27",
       4,
     );
 
     expect(forecast.upcoming[0].periodStart).toBe("2026-06-24");
   });
+
+  it("uses saved period history to average future cycle length", () => {
+    const forecast = generateForecast(
+      settings,
+      [
+        { id: "a", startDate: "2026-03-01", periodLengthDays: 4 },
+        { id: "b", startDate: "2026-03-30", periodLengthDays: 5 },
+        { id: "c", startDate: "2026-04-27", periodLengthDays: 6 },
+      ],
+      "2026-05-01",
+      4,
+    );
+
+    expect(effectiveCycleLength(settings, [
+      { id: "a", startDate: "2026-03-01", periodLengthDays: 4 },
+      { id: "b", startDate: "2026-03-30", periodLengthDays: 5 },
+      { id: "c", startDate: "2026-04-27", periodLengthDays: 6 },
+    ])).toBe(29);
+    expect(forecast.upcoming[0].periodStart).toBe("2026-05-26");
+    expect(forecast.upcoming[0].periodEnd).toBe("2026-05-31");
+  });
+
+  it("includes optional past months in the calendar window", () => {
+    const window = createCalendarWindow("2026-05-27", 4, 3);
+
+    expect(window.months).toHaveLength(7);
+    expect(window.viewStart).toBe("2026-02-01");
+    expect(window.viewEnd).toBe("2026-08-31");
+  });
 });
 
 describe("cycle validation", () => {
   it("rejects future dates and values outside hard limits", () => {
-    expect(
-      validateCycleInput(
-        {
-          lastPeriodStart: "2026-05-28",
-          cycleLengthDays: 14,
-          periodLengthDays: 15,
-        },
-        "2026-05-27",
-      ).errors,
-    ).toEqual(["futureStart", "cycleRange", "periodRange", "periodLongerThanCycle"]);
+    expect(validateCycleSettings({
+      cycleLengthDays: 14,
+      periodLengthDays: 15,
+    }).errors).toEqual(["cycleRange", "periodRange", "periodLongerThanCycle"]);
+    expect(validatePeriodEntry(
+      { startDate: "2026-05-28", periodLengthDays: 15 },
+      "2026-05-27",
+    ).errors).toEqual(["futureStart", "periodRange"]);
   });
 
   it("allows atypical cycle lengths while requesting a warning", () => {
-    const result = validateCycleInput(
-      { ...input, cycleLengthDays: 40 },
-      "2026-05-27",
-    );
+    const result = validateCycleSettings({ ...settings, cycleLengthDays: 40 });
 
     expect(result.errors).toEqual([]);
     expect(result.atypicalCycle).toBe(true);
+  });
+
+  it("validates period history limits and duplicate starts", () => {
+    expect(
+      validatePeriodEntry(
+        { startDate: "2026-02-26", periodLengthDays: 5 },
+        "2026-05-27",
+      ).errors,
+    ).toEqual(["periodStartTooOld"]);
+    expect(
+      validatePeriodEntry(
+        { startDate: "2026-05-04", periodLengthDays: 5 },
+        "2026-05-27",
+        entries,
+      ).errors,
+    ).toEqual(["periodDuplicate"]);
   });
 });
 
@@ -118,7 +176,7 @@ describe("trip planning", () => {
   });
 
   it("detects overlap with each forecast layer without interpreting it", () => {
-    const forecast = generateForecast(input, "2026-05-27", 4);
+    const forecast = generateForecast(settings, entries, "2026-05-27", 4);
     expect(tripOverlapLayers(trip, forecast.predictions)).toEqual([
       "period",
       "fertile",
@@ -143,26 +201,30 @@ describe("trip planning", () => {
     ).toBe(false);
   });
 
-  it("migrates stored cycle settings into state v2 with trips enabled", () => {
+  it("migrates stored cycle settings into state v3 with trips enabled", () => {
     expect(
       migrateStoredState({
         storageVersion: 1,
-        ...input,
+        ...legacyInput,
         locale: "pl",
         horizonMonths: 6,
         visibleLayers: { period: true, fertile: false, ovulation: true },
       }),
     ).toEqual({
-      storageVersion: 2,
-      cycle: input,
+      storageVersion: 4,
+      cycleSettings: settings,
+      periodEntries: entries,
       trips: [],
       locale: "pl",
       horizonMonths: 4,
+      pastMonths: 0,
+      holidayCountry: "PL",
       visibleLayers: {
         period: true,
         fertile: false,
         ovulation: true,
         trips: true,
+        holidays: true,
       },
     });
   });
@@ -171,7 +233,7 @@ describe("trip planning", () => {
     expect(
       migrateStoredState({
         storageVersion: 2,
-        cycle: input,
+        cycle: legacyInput,
         trips: [trip],
         locale: "pl",
         horizonMonths: 9,
@@ -183,10 +245,82 @@ describe("trip planning", () => {
         },
       }),
     ).toMatchObject({
-      cycle: input,
+      cycleSettings: settings,
+      periodEntries: entries,
       trips: [trip],
       horizonMonths: 8,
+      pastMonths: 0,
+      holidayCountry: "PL",
     });
+  });
+
+  it("migrates v3 state to v4 with holiday settings", () => {
+    expect(
+      migrateStoredState({
+        storageVersion: 3,
+        cycleSettings: settings,
+        periodEntries: entries,
+        trips: [trip],
+        locale: "en",
+        horizonMonths: 4,
+        pastMonths: 1,
+        visibleLayers: {
+          period: true,
+          fertile: true,
+          ovulation: true,
+          trips: true,
+        },
+      }),
+    ).toMatchObject({
+      storageVersion: 4,
+      holidayCountry: null,
+      visibleLayers: {
+        holidays: true,
+      },
+    });
+  });
+});
+
+describe("holiday planning", () => {
+  it("returns country options and public holidays for Poland, Germany and the UK", () => {
+    const countries = holidayCountries("en");
+    const window = createCalendarWindow("2026-01-01", 2);
+
+    expect(countries.some((country) => country.code === "PL")).toBe(true);
+    expect(holidayEventsForWindow("PL", window, "pl")[0]).toMatchObject({
+      countryCode: "PL",
+      date: "2026-01-01",
+      type: "public",
+    });
+    expect(holidayEventsForWindow("DE", window, "en").some((holiday) => holiday.type === "public" || holiday.type === "bank")).toBe(true);
+    expect(holidayEventsForWindow("GB", window, "en").some((holiday) => holiday.name === "New Year's Day")).toBe(true);
+    expect(holidayEventsForWindow(null, window, "en")).toEqual([]);
+  });
+
+  it("builds trip readiness from cycle and holiday overlaps without scoring the trip", () => {
+    const forecast = generateForecast(settings, entries, "2026-05-27", 4);
+    const holidays = [
+      {
+        id: "holiday",
+        countryCode: "PL",
+        name: "Dzień wolny",
+        date: "2026-06-01",
+        type: "public" as const,
+      },
+    ];
+    const readiness = tripReadiness(
+      { id: "trip", name: "Weekend", startDate: "2026-06-01", endDate: "2026-06-02" },
+      forecast.predictions,
+      holidays,
+      settings,
+      entries,
+    );
+
+    expect(readiness.predictedPeriodOverlap).toBe(true);
+    expect(readiness.holidayOverlaps).toHaveLength(1);
+    expect(readiness.preparationHints).toContain("periodKit");
+    expect(readiness.preparationHints).toContain("travelTiming");
+    expect(readiness.forecastConfidence).toBe("low");
   });
 });
 

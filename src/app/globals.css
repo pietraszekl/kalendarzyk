@@ -17,6 +17,8 @@
   --ovulation-soft: #f4e7d5;
   --trips: #315987;
   --trips-soft: #dee9f5;
+  --holidays: #7d5a9c;
+  --holidays-soft: #ece3f4;
   --warning: #845f25;
   --warning-soft: #fbf1dd;
   --danger: #9c354d;
@@ -264,6 +266,30 @@ button:disabled {
   gap: 18px;
 }
 
+.period-form {
+  border-top: 1px solid var(--border);
+  margin-top: 22px;
+  padding-top: 20px;
+}
+
+.form-subtitle,
+.form-subtitle-row h3 {
+  font-size: 0.86rem;
+  margin: 0;
+}
+
+.form-subtitle-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.form-subtitle-row small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
 .form-panel label,
 .trip-panel label {
   color: var(--foreground);
@@ -275,7 +301,8 @@ button:disabled {
 }
 
 .form-panel input,
-.trip-panel input {
+.trip-panel input,
+.holiday-settings select {
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 9px;
@@ -289,6 +316,7 @@ button:disabled {
 
 .form-panel input:focus,
 .trip-panel input:focus,
+.holiday-settings select:focus,
 .language-picker select:focus {
   border-color: var(--accent);
 }
@@ -379,13 +407,15 @@ button:disabled {
   height: 43px;
 }
 
-.trip-list-section {
+.trip-list-section,
+.period-list-section {
   border-top: 1px solid var(--border);
   margin-top: 23px;
   padding-top: 19px;
 }
 
 .trip-list-section h3,
+.period-list-section h3,
 .past-trips summary {
   color: var(--foreground);
   font-size: 0.83rem;
@@ -409,7 +439,8 @@ button:disabled {
   padding: 0;
 }
 
-.trip-item {
+.trip-item,
+.period-item {
   align-items: start;
   background: #f7f9fc;
   border: 1px solid #dbe4ef;
@@ -418,6 +449,11 @@ button:disabled {
   gap: 8px;
   justify-content: space-between;
   padding: 10px;
+}
+
+.period-item {
+  background: #fff7f8;
+  border-color: #efd5dc;
 }
 
 .trip-details {
@@ -462,6 +498,27 @@ button:disabled {
 
 .overlap-ovulation {
   color: var(--ovulation);
+}
+
+.overlap-holidays {
+  color: var(--holidays);
+}
+
+.readiness-card {
+  background: rgb(255 255 255 / 68%);
+  border: 1px solid rgb(222 215 208 / 75%);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 8px;
+}
+
+.readiness-card small {
+  color: var(--muted);
+  font-size: 0.69rem;
+  line-height: 1.35;
 }
 
 .trip-actions {
@@ -572,13 +629,79 @@ button:disabled {
   align-items: center;
   border-bottom: 1px solid var(--border);
   display: flex;
+  gap: 14px;
   justify-content: space-between;
   margin-bottom: 19px;
   padding-bottom: 17px;
 }
 
+.result-toolbar h2 {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
 .result-toolbar .eyebrow {
   margin-bottom: 7px;
+}
+
+.forecast-chips {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 8px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.forecast-chip {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--chip-ink);
+  display: inline-flex;
+  flex: 0 1 auto;
+  gap: 6px;
+  min-width: 0;
+  padding: 7px 10px;
+}
+
+.forecast-chip svg {
+  color: var(--chip-ink);
+  flex: 0 0 auto;
+}
+
+.forecast-chip-label {
+  color: var(--chip-ink);
+  font-size: 0.68rem;
+  font-weight: 600;
+  opacity: 0.78;
+  white-space: nowrap;
+}
+
+.forecast-chip strong {
+  color: var(--chip-ink);
+  font-size: 0.74rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.forecast-chip-period {
+  background: var(--period-soft);
+  border-color: #ebbac5;
+  --chip-ink: #8f3349;
+}
+
+.forecast-chip-ovulation {
+  background: var(--ovulation-soft);
+  border-color: #e8cca5;
+  --chip-ink: #7a4f25;
+}
+
+.forecast-chip-fertile {
+  background: var(--fertile-soft);
+  border-color: #b9dacc;
+  --chip-ink: #28624f;
 }
 
 .toolbar-actions {
@@ -691,27 +814,41 @@ legend {
 }
 
 .toggle:has(input:checked) {
-  color: var(--foreground);
+  color: var(--toggle-ink, var(--accent));
+}
+
+.toggle:has(input:checked) svg {
+  color: var(--toggle-ink, var(--accent));
 }
 
 .toggle-period:has(input:checked) {
   background: var(--period-soft);
   border-color: #ebbac5;
+  --toggle-ink: #8f3349;
 }
 
 .toggle-fertile:has(input:checked) {
   background: var(--fertile-soft);
   border-color: #b9dacc;
+  --toggle-ink: #28624f;
 }
 
 .toggle-ovulation:has(input:checked) {
   background: var(--ovulation-soft);
   border-color: #e8cca5;
+  --toggle-ink: #7a4f25;
 }
 
 .toggle-trips:has(input:checked) {
   background: var(--trips-soft);
   border-color: #b8cee6;
+  --toggle-ink: #254b78;
+}
+
+.toggle-holidays:has(input:checked) {
+  background: var(--holidays-soft);
+  border-color: #d8c7e7;
+  --toggle-ink: #684486;
 }
 
 .forecast-report {
@@ -860,6 +997,10 @@ legend {
 
 .legend-trips {
   color: var(--trips);
+}
+
+.legend-holidays {
+  color: var(--holidays);
 }
 
 .months {
@@ -1019,6 +1160,11 @@ legend {
   color: var(--trips);
 }
 
+.bar-holidays {
+  background: var(--holidays-soft);
+  color: var(--holidays);
+}
+
 .day-number {
   line-height: 1;
 }
@@ -1098,36 +1244,6 @@ legend {
   margin: 0;
 }
 
-.summary-highlights {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.summary-highlights article {
-  align-items: center;
-  background: var(--surface-muted);
-  border-radius: 10px;
-  display: grid;
-  gap: 2px 9px;
-  grid-template-columns: 19px 1fr;
-  padding: 10px 11px;
-}
-
-.summary-highlights svg {
-  color: var(--accent);
-  grid-row: span 2;
-}
-
-.summary-highlights span {
-  color: var(--muted);
-  font-size: 0.7rem;
-}
-
-.summary-highlights strong {
-  font-size: 0.8rem;
-}
-
 .summary-panel .warning,
 .summary-panel .disclaimer,
 .summary-panel .calendar-note {
@@ -1153,6 +1269,38 @@ legend {
   border: 0;
   box-shadow: none;
   padding: 0;
+}
+
+.holiday-settings {
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 2px;
+  padding-top: 12px;
+  width: 100%;
+}
+
+.holiday-settings label:not(.toggle) {
+  color: var(--foreground);
+  display: flex;
+  flex-direction: column;
+  font-size: 0.8rem;
+  font-weight: 600;
+  gap: 7px;
+}
+
+.holiday-settings select {
+  height: 42px;
+  padding: 0 10px;
+  width: 100%;
+}
+
+.holiday-settings p {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+  margin: 0;
 }
 
 .capture-header {
@@ -1225,6 +1373,10 @@ legend {
 
 .detail-trips {
   color: var(--trips);
+}
+
+.detail-holidays {
+  color: var(--holidays);
 }
 
 .forecast-report.export-capture .capture-header {
@@ -1414,8 +1566,45 @@ legend {
 
   .result-toolbar {
     align-items: center;
+    gap: 8px;
     margin-bottom: 13px;
     padding: 0 4px 12px;
+  }
+
+  .result-toolbar h2 {
+    font-size: 1.03rem;
+  }
+
+  .forecast-chips {
+    -webkit-overflow-scrolling: touch;
+    gap: 6px;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .forecast-chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .forecast-chip {
+    flex: 0 0 auto;
+    gap: 5px;
+    max-width: 118px;
+    padding: 6px 8px;
+  }
+
+  .forecast-chip-label {
+    clip-path: inset(50%);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+  }
+
+  .forecast-chip strong {
+    font-size: 0.7rem;
   }
 
   .mobile-manage-button {

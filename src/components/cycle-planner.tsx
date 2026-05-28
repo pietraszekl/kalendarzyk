@@ -2,6 +2,7 @@
 
 import { toPng } from "html-to-image";
 import {
+  CalendarDays,
   CalendarPlus,
   ChevronDown,
   Download,
@@ -29,17 +30,23 @@ import {
   CalendarBarEvent,
   CalendarBarSegment,
   CalendarWindow,
+  CycleSettings,
   CycleLayer,
   CyclePrediction,
   Forecast,
+  HolidayEvent,
   HorizonMonths,
   Layer,
   Locale,
+  PastMonths,
+  PeriodEntry,
   Trip,
   VisibleLayers,
   addDays,
+  addMonths,
   createCalendarWindow,
   defaultAppState,
+  effectiveCycleLength,
   generateForecast,
   generateIcsCalendar,
   IcsEvent,
@@ -48,17 +55,24 @@ import {
   layoutCalendarBars,
   layersForDate,
   migrateStoredState,
+  pastMonthsForDate,
   parseDateKey,
+  sortPeriodEntries,
   splitTrips,
   toDateKey,
   tripOverlapLayers,
+  tripReadiness,
   tripsForDate,
-  validateCycleInput,
+  validateCycleSettings,
+  validatePeriodEntry,
   validateTrip,
 } from "@/lib/cycle";
+import { holidayCountries, holidayEventsForWindow } from "@/lib/holidays";
 import { copy, dateLocale, layerName } from "@/lib/i18n";
 
-const STORAGE_KEY = "kalendarzyk.settings.v2";
+const STORAGE_KEY = "kalendarzyk.settings.v4";
+const LEGACY_V3_STORAGE_KEY = "kalendarzyk.settings.v3";
+const LEGACY_V2_STORAGE_KEY = "kalendarzyk.settings.v2";
 const LEGACY_STORAGE_KEY = "kalendarzyk.settings.v1";
 const LOCALE_KEY = "kalendarzyk.locale";
 const PANEL_TAB_KEY = "kalendarzyk.panelTab";
@@ -67,8 +81,12 @@ const MOBILE_QUERY = "(max-width: 820px)";
 type PanelTab = "summary" | "trips" | "cycle";
 
 interface CycleFormValues {
-  lastPeriodStart: string;
   cycleLengthDays: string;
+  periodLengthDays: string;
+}
+
+interface PeriodFormValues {
+  startDate: string;
   periodLengthDays: string;
 }
 
@@ -83,136 +101,157 @@ interface CalendarDayCell {
   isOutsideMonth: boolean;
 }
 
-function CycleCompassLogo({ size = 56 }: { size?: number }) {
+function MoonBloomLogo({ size = 56 }: { size?: number }) {
+  const p = "kl";
   return (
     <svg
       aria-hidden="true"
       className="cycle-compass-logo"
       focusable="false"
       height={size}
-      viewBox="0 0 64 64"
       width={size}
+      viewBox="0 0 56 56"
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>
-        <linearGradient id="cycleCompassGlass" x1="11" x2="53" y1="5" y2="59">
-          <stop stopColor="#ffffff" stopOpacity="0.94" />
-          <stop offset="0.52" stopColor="#f4eee8" stopOpacity="0.75" />
-          <stop offset="1" stopColor="#e6dcd2" stopOpacity="0.84" />
-        </linearGradient>
-        <radialGradient id="cycleCompassGlow" cx="34%" cy="22%" r="70%">
-          <stop stopColor="#ffffff" stopOpacity="0.95" />
-          <stop offset="0.5" stopColor="#ffffff" stopOpacity="0.18" />
-          <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+        {/* Compass disc — soft sage gradient */}
+        <radialGradient id={`${p}-disc`} cx="38%" cy="30%" r="62%">
+          <stop offset="0%" stopColor="#e1ede5" />
+          <stop offset="55%" stopColor="#c4dccf" />
+          <stop offset="100%" stopColor="#a4c4b5" />
         </radialGradient>
-        <linearGradient id="cycleCompassNorth" x1="32" x2="32" y1="7" y2="34">
-          <stop stopColor="#38766b" />
-          <stop offset="1" stopColor="#1f4f47" />
+
+        {/* Top-left specular highlight */}
+        <radialGradient id={`${p}-spec`} cx="32%" cy="26%" r="32%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.6" />
+          <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+        </radialGradient>
+
+        {/* Bottom-right rim shadow */}
+        <radialGradient id={`${p}-rimShadow`} cx="78%" cy="82%" r="35%">
+          <stop offset="0%" stopColor="#5a8576" stopOpacity="0.22" />
+          <stop offset="100%" stopColor="#5a8576" stopOpacity="0" />
+        </radialGradient>
+
+        {/* Drop / needle gradient — wine to deep rose */}
+        <linearGradient id={`${p}-drop`} x1="0.3" y1="0.1" x2="0.7" y2="1">
+          <stop offset="0%" stopColor="#d05266" />
+          <stop offset="55%" stopColor="#a83048" />
+          <stop offset="100%" stopColor="#732038" />
         </linearGradient>
-        <linearGradient id="cycleCompassEast" x1="31" x2="56" y1="31" y2="31">
-          <stop stopColor="#4a79a6" />
-          <stop offset="1" stopColor="#244d7b" />
-        </linearGradient>
-        <linearGradient id="cycleCompassSouth" x1="32" x2="32" y1="57" y2="31">
-          <stop stopColor="#b7793d" />
-          <stop offset="1" stopColor="#8f5f32" />
-        </linearGradient>
-        <linearGradient id="cycleCompassWest" x1="8" x2="33" y1="31" y2="31">
-          <stop stopColor="#c86178" />
-          <stop offset="1" stopColor="#9f435a" />
-        </linearGradient>
-        <filter id="cycleCompassSoftShadow" colorInterpolationFilters="sRGB" x="-30%" y="-30%" width="160%" height="170%">
-          <feDropShadow dx="0" dy="5" stdDeviation="3.6" floodColor="#5f4a3d" floodOpacity="0.16" />
-          <feDropShadow dx="0" dy="1" stdDeviation="1" floodColor="#ffffff" floodOpacity="0.75" />
+
+        {/* Drop glassy highlight */}
+        <radialGradient id={`${p}-shine`} cx="34%" cy="40%" r="28%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.55" />
+          <stop offset="60%" stopColor="#ffffff" stopOpacity="0.12" />
+          <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+        </radialGradient>
+
+        {/* Drop depth shading */}
+        <radialGradient id={`${p}-deep`} cx="50%" cy="92%" r="38%">
+          <stop offset="0%" stopColor="#4a1224" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="#4a1224" stopOpacity="0" />
+        </radialGradient>
+
+        {/* Compass disc shadow */}
+        <filter id={`${p}-sh`} colorInterpolationFilters="sRGB" x="-18%" y="-12%" width="136%" height="134%">
+          <feDropShadow dx="0" dy="2" stdDeviation="2.4" floodColor="#3a6258" floodOpacity="0.16" />
+          <feDropShadow dx="0" dy="0.5" stdDeviation="0.4" floodColor="#ffffff" floodOpacity="0.4" />
         </filter>
-        <filter id="cycleCompassNeedleShadow" colorInterpolationFilters="sRGB" x="-24%" y="-24%" width="148%" height="148%">
-          <feDropShadow dx="0" dy="2" stdDeviation="1.4" floodColor="#3e2f29" floodOpacity="0.22" />
+
+        {/* Drop shadow — tighter */}
+        <filter id={`${p}-dropSh`} colorInterpolationFilters="sRGB" x="-30%" y="-20%" width="160%" height="160%">
+          <feDropShadow dx="0" dy="0.8" stdDeviation="0.8" floodColor="#5a1828" floodOpacity="0.3" />
         </filter>
       </defs>
-      <rect
-        fill="url(#cycleCompassGlass)"
-        filter="url(#cycleCompassSoftShadow)"
-        height="54"
-        rx="19"
-        stroke="#ffffff"
-        strokeOpacity="0.82"
-        strokeWidth="1.2"
-        width="54"
-        x="5"
-        y="5"
-      />
-      <rect fill="url(#cycleCompassGlow)" height="54" rx="19" width="54" x="5" y="5" />
-      <path
-        d="M13 15.8C19.8 8.6 31.2 6.2 41.1 10.7"
-        fill="none"
-        opacity="0.78"
-        stroke="var(--fertile)"
-        strokeLinecap="round"
-        strokeWidth="3.4"
-      />
-      <path
-        d="M48.8 18.2C55.5 28.1 53 42 43.2 49.2"
-        fill="none"
-        opacity="0.78"
-        stroke="var(--trips)"
-        strokeLinecap="round"
-        strokeWidth="3.4"
-      />
-      <path
-        d="M22.2 52.8C12.6 48.6 7.3 38.2 9.3 28.1"
-        fill="none"
-        opacity="0.78"
-        stroke="var(--period)"
-        strokeLinecap="round"
-        strokeWidth="3.4"
-      />
-      <g filter="url(#cycleCompassNeedleShadow)">
-        <path
-          d="M32 7.8L37.4 27.3L32 23.9L26.6 27.3L32 7.8Z"
-          fill="url(#cycleCompassNorth)"
-          stroke="#fffaf4"
-          strokeLinejoin="round"
-          strokeWidth="1.45"
-        />
-        <path
-          d="M56.2 32L36.7 37.4L40.1 32L36.7 26.6L56.2 32Z"
-          fill="url(#cycleCompassEast)"
-          stroke="#fffaf4"
-          strokeLinejoin="round"
-          strokeWidth="1.45"
-        />
-        <path
-          d="M32 56.2L26.6 36.7L32 40.1L37.4 36.7L32 56.2Z"
-          fill="url(#cycleCompassSouth)"
-          stroke="#fffaf4"
-          strokeLinejoin="round"
-          strokeWidth="1.45"
-        />
-        <path
-          d="M7.8 32L27.3 26.6L23.9 32L27.3 37.4L7.8 32Z"
-          fill="url(#cycleCompassWest)"
-          stroke="#fffaf4"
-          strokeLinejoin="round"
-          strokeWidth="1.45"
-        />
-        <path d="M17.6 17.6L29.1 27.7L27.7 29.1L17.6 17.6Z" fill="var(--ovulation)" opacity="0.88" />
-        <path d="M46.4 17.6L36.3 29.1L34.9 27.7L46.4 17.6Z" fill="var(--period)" opacity="0.84" />
-        <path d="M46.4 46.4L34.9 36.3L36.3 34.9L46.4 46.4Z" fill="var(--fertile)" opacity="0.84" />
-        <path d="M17.6 46.4L27.7 34.9L29.1 36.3L17.6 46.4Z" fill="var(--trips)" opacity="0.84" />
+
+      {/* ── Compass disc ── */}
+      <g filter={`url(#${p}-sh)`}>
+        <circle cx="28" cy="28" r="25" fill={`url(#${p}-disc)`} />
+        <circle cx="28" cy="28" r="25" fill={`url(#${p}-rimShadow)`} />
+        <circle cx="28" cy="28" r="25" fill={`url(#${p}-spec)`} />
+        {/* Polished inner edge */}
+        <circle cx="28" cy="28" r="24.5" fill="none" stroke="#ffffff" strokeOpacity="0.45" strokeWidth="0.6" />
+        {/* Outer rim */}
+        <circle cx="28" cy="28" r="25" fill="none" stroke="#7aa092" strokeWidth="0.4" opacity="0.4" />
       </g>
-      <circle cx="32" cy="32" fill="#fffaf4" r="5.4" />
-      <circle cx="32" cy="32" fill="var(--accent)" r="3.25" />
-      <circle cx="32" cy="32" fill="#ffffff" opacity="0.78" r="1.1" />
-      <circle cx="48" cy="47.6" fill="var(--ovulation)" r="4.1" />
-      <circle cx="48" cy="47.6" fill="#fffaf4" r="1.45" />
-      <path d="M16 12.5C23 7.9 33 7.2 40.8 10.8" fill="none" opacity="0.55" stroke="#ffffff" strokeLinecap="round" strokeWidth="2.2" />
+
+      {/* ── Compass face ── */}
+      {/* Outer compass ring */}
+      <circle cx="28" cy="28" r="20" fill="none" stroke="#5a8576" strokeWidth="0.5" opacity="0.4" />
+      {/* Inner compass ring */}
+      <circle cx="28" cy="28" r="14" fill="none" stroke="#5a8576" strokeWidth="0.35" opacity="0.28" />
+
+      {/* Cardinal direction ticks — long */}
+      <g stroke="#3a6e62" strokeWidth="1.3" strokeLinecap="round">
+        <line x1="49" y1="28" x2="46" y2="28" opacity="0.55" />
+        <line x1="28" y1="49" x2="28" y2="46" opacity="0.55" />
+        <line x1="7" y1="28" x2="10" y2="28" opacity="0.55" />
+      </g>
+
+      {/* N tick (slightly emphasized) */}
+      <line x1="28" y1="7" x2="28" y2="11" stroke="#3a6e62" strokeWidth="1.5" strokeLinecap="round" opacity="0.7" />
+
+      {/* N label */}
+      <text
+        x="28"
+        y="17.6"
+        textAnchor="middle"
+        fontSize="4.6"
+        fontWeight="700"
+        fontFamily="ui-sans-serif, system-ui, sans-serif"
+        fill="#2d5a4f"
+        opacity="0.7"
+      >
+        N
+      </text>
+
+      {/* Intercardinal dots */}
+      <g fill="#3a6e62" opacity="0.42">
+        <circle cx="43.4" cy="12.6" r="1" />
+        <circle cx="43.4" cy="43.4" r="1" />
+        <circle cx="12.6" cy="43.4" r="1" />
+        <circle cx="12.6" cy="12.6" r="1" />
+      </g>
+
+      {/* ── Needle = blood drop pointing North ── */}
+      <g filter={`url(#${p}-dropSh)`}>
+        <path
+          d="M 28 19 C 24 24, 23 30.5, 28 33.5 C 33 30.5, 32 24, 28 19 Z"
+          fill={`url(#${p}-drop)`}
+        />
+        <path
+          d="M 28 19 C 24 24, 23 30.5, 28 33.5 C 33 30.5, 32 24, 28 19 Z"
+          fill={`url(#${p}-deep)`}
+        />
+        <path
+          d="M 28 19 C 24 24, 23 30.5, 28 33.5 C 33 30.5, 32 24, 28 19 Z"
+          fill={`url(#${p}-shine)`}
+        />
+        <path
+          d="M 28 19 C 24 24, 23 30.5, 28 33.5 C 33 30.5, 32 24, 28 19 Z"
+          fill="none"
+          stroke="#4a1224"
+          strokeWidth="0.4"
+          opacity="0.25"
+        />
+
+        {/* Compass pivot — center hub */}
+        <circle cx="28" cy="33" r="2.4" fill="#8aae9f" />
+        <circle cx="28" cy="33" r="2.4" fill="none" stroke="#5a8576" strokeWidth="0.4" />
+        <circle cx="28" cy="33" r="0.9" fill="#3a6e62" opacity="0.8" />
+      </g>
     </svg>
   );
 }
 
 const EMPTY_CYCLE_FORM: CycleFormValues = {
-  lastPeriodStart: "",
   cycleLengthDays: "28",
+  periodLengthDays: "5",
+};
+
+const EMPTY_PERIOD_FORM: PeriodFormValues = {
+  startDate: "",
   periodLengthDays: "5",
 };
 
@@ -240,6 +279,10 @@ function persistState(state: AppState) {
 
 function createTripId() {
   return globalThis.crypto?.randomUUID?.() ?? `trip-${Date.now()}`;
+}
+
+function createPeriodId(startDate: string) {
+  return globalThis.crypto?.randomUUID?.() ?? `period-${startDate}-${Date.now()}`;
 }
 
 function subscribeToMobileViewport(callback: () => void) {
@@ -279,6 +322,7 @@ function nextEvent(
   layer: "fertile" | "ovulation",
 ) {
   const starts = forecast.predictions
+    .filter((prediction) => !prediction.observed)
     .map((prediction) =>
       layer === "ovulation" ? prediction.ovulation : prediction.fertileStart,
     )
@@ -288,7 +332,7 @@ function nextEvent(
   if (!start) return null;
   if (layer === "ovulation") return { start, end: start };
   const match = forecast.predictions.find(
-    (prediction) => prediction.fertileStart === start,
+    (prediction) => !prediction.observed && prediction.fertileStart === start,
   );
   return match ? { start, end: match.fertileEnd } : null;
 }
@@ -297,6 +341,7 @@ function LayerIcon({ layer, size = 15 }: { layer: Layer; size?: number }) {
   if (layer === "period") return <Droplets size={size} />;
   if (layer === "fertile") return <Leaf size={size} />;
   if (layer === "ovulation") return <Sparkles size={size} />;
+  if (layer === "holidays") return <CalendarDays size={size} />;
   return <Plane size={size} />;
 }
 
@@ -304,6 +349,7 @@ function CalendarMonth({
   month,
   predictions,
   trips,
+  holidays,
   layers,
   locale,
   today,
@@ -314,6 +360,7 @@ function CalendarMonth({
   month: string;
   predictions: CyclePrediction[];
   trips: Trip[];
+  holidays: HolidayEvent[];
   layers: VisibleLayers;
   locale: Locale;
   today: string;
@@ -344,14 +391,17 @@ function CalendarMonth({
   );
   const title = formatDate(month, locale, { month: "long", year: "numeric" });
   const cycleEvents: CalendarBarEvent[] = predictions.flatMap(
-    (prediction, index) => [
-      {
+    (prediction, index) => {
+      const periodEvent = {
         id: `period-${index}`,
         layer: "period",
         label: t.periodShort,
         startDate: prediction.periodStart,
         endDate: prediction.periodEnd,
-      },
+      } satisfies CalendarBarEvent;
+      if (prediction.observed) return [periodEvent];
+      return [
+        periodEvent,
       {
         id: `fertile-${index}`,
         layer: "fertile",
@@ -366,7 +416,8 @@ function CalendarMonth({
         startDate: prediction.ovulation,
         endDate: prediction.ovulation,
       },
-    ],
+      ];
+    },
   );
   const visibleEvents: CalendarBarEvent[] = [
     ...cycleEvents.filter((event) => layers[event.layer]),
@@ -379,6 +430,15 @@ function CalendarMonth({
           endDate: trip.endDate,
         }))
       : []),
+    ...(layers.holidays
+      ? holidays.map((holiday) => ({
+          id: holiday.id,
+          layer: "holidays" as const,
+          label: holiday.name,
+          startDate: holiday.date,
+          endDate: holiday.date,
+        }))
+      : []),
   ];
   const layout = layoutCalendarBars(month, visibleEvents);
 
@@ -386,6 +446,8 @@ function CalendarMonth({
     const accessibleLabel =
       segment.layer === "trips"
         ? `${t.trips}: ${segment.label}`
+        : segment.layer === "holidays"
+          ? `${t.holidays}: ${segment.label}`
         : layerName(locale, segment.layer);
     return (
       <span
@@ -439,9 +501,13 @@ function CalendarMonth({
                   (layer) => layers[layer],
                 );
                 const matchingTrips = layers.trips ? tripsForDate(value, trips) : [];
+                const matchingHolidays = layers.holidays
+                  ? holidays.filter((holiday) => holiday.date === value)
+                  : [];
                 const description = [
                   ...cycleLayers.map((layer) => layerName(locale, layer)),
                   ...matchingTrips.map((trip) => `${t.trips}: ${trip.name}`),
+                  ...matchingHolidays.map((holiday) => `${t.holidays}: ${holiday.name}`),
                 ].join(", ");
                 const isToday = value === today;
                 return (
@@ -487,7 +553,7 @@ function CalendarMonth({
             {selectedEvents.map((event) => (
               <li className={`detail-${event.layer}`} key={event.id}>
                 <LayerIcon layer={event.layer} size={14} />
-                {event.layer === "trips" ? event.label : layerName(locale, event.layer)}
+                {event.layer === "trips" || event.layer === "holidays" ? event.label : layerName(locale, event.layer)}
               </li>
             ))}
           </ul>
@@ -501,14 +567,19 @@ function Legend({
   locale,
   layers,
   hasCycle,
+  hasHolidays,
 }: {
   locale: Locale;
   layers: VisibleLayers;
   hasCycle: boolean;
+  hasHolidays: boolean;
 }) {
-  const listed: Layer[] = hasCycle
-    ? ["period", "fertile", "ovulation", "trips"]
-    : ["trips"];
+  const listed: Layer[] = [
+    ...(hasCycle
+      ? (["period", "fertile", "ovulation", "trips"] as Layer[])
+      : (["trips"] as Layer[])),
+    ...(hasHolidays ? (["holidays"] as Layer[]) : []),
+  ];
   return (
     <ul className="legend" aria-label={copy[locale].layers}>
       {listed
@@ -523,11 +594,69 @@ function Legend({
   );
 }
 
+function ForecastChips({
+  locale,
+  nextPeriod,
+  nextOvulation,
+  nextFertile,
+}: {
+  locale: Locale;
+  nextPeriod: CyclePrediction | null;
+  nextOvulation: ReturnType<typeof nextEvent>;
+  nextFertile: ReturnType<typeof nextEvent>;
+}) {
+  const t = copy[locale];
+  if (!nextPeriod && !nextOvulation && !nextFertile) return null;
+
+  const chips = [
+    {
+      key: "period",
+      label: t.nextPeriod,
+      value: nextPeriod ? formatRange(nextPeriod.periodStart, nextPeriod.periodEnd, locale) : "-",
+      icon: <Droplets size={15} />,
+    },
+    {
+      key: "ovulation",
+      label: t.nextOvulation,
+      value: nextOvulation ? formatDate(nextOvulation.start, locale) : "-",
+      icon: <Sparkles size={15} />,
+    },
+    {
+      key: "fertile",
+      label: t.nextFertile,
+      value: nextFertile ? formatRange(nextFertile.start, nextFertile.end, locale) : "-",
+      icon: <Leaf size={15} />,
+    },
+  ];
+
+  return (
+    <div className="forecast-chips" role="list">
+      {chips.map((chip) => {
+        const accessibleLabel = `${chip.label}: ${chip.value}`;
+        return (
+          <span
+            aria-label={accessibleLabel}
+            className={`forecast-chip forecast-chip-${chip.key}`}
+            key={chip.key}
+            role="listitem"
+            title={accessibleLabel}
+          >
+            {chip.icon}
+            <span className="forecast-chip-label">{chip.label}</span>
+            <strong>{chip.value}</strong>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 function TripItem({
   trip,
   locale,
   window,
   overlap,
+  readiness,
   onEdit,
   onRemove,
 }: {
@@ -535,10 +664,28 @@ function TripItem({
   locale: Locale;
   window: CalendarWindow;
   overlap: CycleLayer[];
+  readiness: ReturnType<typeof tripReadiness> | null;
   onEdit: (trip: Trip) => void;
   onRemove: (trip: Trip) => void;
 }) {
   const t = copy[locale];
+  const readinessLines =
+    readiness
+      ? [
+          readiness.observedPeriodOverlap ? t.readinessObservedPeriod : null,
+          readiness.predictedPeriodOverlap ? t.readinessPredictedPeriod : null,
+          readiness.holidayOverlaps.length > 0
+            ? t.readinessHolidays.replace("{count}", String(readiness.holidayOverlaps.length))
+            : null,
+          t.readinessConfidence.replace(
+            "{level}",
+            t.forecastConfidence[readiness.forecastConfidence],
+          ),
+          readiness.preparationHints.length > 0
+            ? `${t.readinessPreparation}: ${readiness.preparationHints.map((hint) => t.preparationHints[hint]).join(", ")}`
+            : null,
+        ].filter(Boolean)
+      : [];
   return (
     <li className="trip-item">
       <div className="trip-details">
@@ -557,6 +704,23 @@ function TripItem({
             ))}
           </span>
         )}
+        {readiness && readiness.holidayOverlaps.length > 0 && (
+          <span className="overlap-icons" aria-label={t.holidayOverlaps}>
+            {readiness.holidayOverlaps.slice(0, 3).map((holiday) => (
+              <span className="overlap-holidays" key={holiday.id} title={holiday.name}>
+                <CalendarDays size={14} />
+                <span className="sr-only">{holiday.name}</span>
+              </span>
+            ))}
+          </span>
+        )}
+        {readinessLines.length > 0 && (
+          <div className="readiness-card" aria-label={t.tripReadiness}>
+            {readinessLines.map((line) => (
+              <small key={line}>{line}</small>
+            ))}
+          </div>
+        )}
       </div>
       <div className="trip-actions">
         <button aria-label={`${t.editTrip}: ${trip.name}`} onClick={() => onEdit(trip)} type="button">
@@ -570,14 +734,49 @@ function TripItem({
   );
 }
 
+function PeriodItem({
+  entry,
+  locale,
+  onEdit,
+  onRemove,
+}: {
+  entry: PeriodEntry;
+  locale: Locale;
+  onEdit: (entry: PeriodEntry) => void;
+  onRemove: (entry: PeriodEntry) => void;
+}) {
+  const t = copy[locale];
+  return (
+    <li className="period-item">
+      <div className="trip-details">
+        <strong>{formatDate(entry.startDate, locale)}</strong>
+        <span>
+          {entry.periodLengthDays} {t.days}
+        </span>
+      </div>
+      <div className="trip-actions">
+        <button aria-label={`${t.editPeriod}: ${formatDate(entry.startDate, locale)}`} onClick={() => onEdit(entry)} type="button">
+          <Pencil size={14} />
+        </button>
+        <button aria-label={`${t.removePeriod}: ${formatDate(entry.startDate, locale)}`} onClick={() => onRemove(entry)} type="button">
+          <Trash2 size={14} />
+        </button>
+      </div>
+    </li>
+  );
+}
+
 export default function CyclePlanner() {
   const today = useMemo(() => toDateKey(new Date()), []);
   const [ready, setReady] = useState(false);
   const [app, setApp] = useState<AppState | null>(null);
   const [cycleForm, setCycleForm] = useState<CycleFormValues>(EMPTY_CYCLE_FORM);
+  const [periodForm, setPeriodForm] = useState<PeriodFormValues>(EMPTY_PERIOD_FORM);
   const [tripForm, setTripForm] = useState<TripFormValues>(EMPTY_TRIP_FORM);
+  const [editingPeriodId, setEditingPeriodId] = useState<string | null>(null);
   const [editingTripId, setEditingTripId] = useState<string | null>(null);
   const [cycleErrors, setCycleErrors] = useState<string[]>([]);
+  const [periodErrors, setPeriodErrors] = useState<string[]>([]);
   const [tripErrors, setTripErrors] = useState<string[]>([]);
   const [showExport, setShowExport] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
@@ -604,13 +803,25 @@ export default function CyclePlanner() {
     let usedLegacyState = false;
     try {
       const current = localStorage.getItem(STORAGE_KEY);
+      const legacyV3 = localStorage.getItem(LEGACY_V3_STORAGE_KEY);
+      const legacyV2 = localStorage.getItem(LEGACY_V2_STORAGE_KEY);
       const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
       restored = migrateStoredState(
-        current ? JSON.parse(current) : legacy ? JSON.parse(legacy) : null,
+        current
+          ? JSON.parse(current)
+          : legacyV3
+            ? JSON.parse(legacyV3)
+          : legacyV2
+            ? JSON.parse(legacyV2)
+            : legacy
+              ? JSON.parse(legacy)
+              : null,
       );
-      usedLegacyState = !current && !!legacy && !!restored;
+      usedLegacyState = !current && (!!legacyV3 || !!legacyV2 || !!legacy) && !!restored;
     } catch {
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(LEGACY_V3_STORAGE_KEY);
+      localStorage.removeItem(LEGACY_V2_STORAGE_KEY);
       localStorage.removeItem(LEGACY_STORAGE_KEY);
     }
     const initialState = restored ?? defaultAppState(fallbackLocale);
@@ -619,15 +830,16 @@ export default function CyclePlanner() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setApp(initialState);
     if (isPanelTab(savedPanelTab)) setPanelTab(savedPanelTab);
-    if (initialState.cycle) {
+    if (initialState.cycleSettings) {
       setCycleForm({
-        lastPeriodStart: initialState.cycle.lastPeriodStart,
-        cycleLengthDays: String(initialState.cycle.cycleLengthDays),
-        periodLengthDays: String(initialState.cycle.periodLengthDays),
+        cycleLengthDays: String(initialState.cycleSettings.cycleLengthDays),
+        periodLengthDays: String(initialState.cycleSettings.periodLengthDays),
       });
     }
     if (usedLegacyState) {
       persistState(initialState);
+      localStorage.removeItem(LEGACY_V3_STORAGE_KEY);
+      localStorage.removeItem(LEGACY_V2_STORAGE_KEY);
       localStorage.removeItem(LEGACY_STORAGE_KEY);
     }
     setReady(true);
@@ -678,20 +890,46 @@ export default function CyclePlanner() {
   }, [drawerOpen, isMobile]);
 
   const calendarWindow = useMemo(
-    () => createCalendarWindow(today, app?.horizonMonths ?? 4),
-    [app?.horizonMonths, today],
+    () => createCalendarWindow(today, app?.horizonMonths ?? 4, app?.pastMonths ?? 0),
+    [app?.horizonMonths, app?.pastMonths, today],
+  );
+  const holidayCountryOptions = useMemo(
+    () => holidayCountries(locale),
+    [locale],
+  );
+  const holidayEvents = useMemo(
+    () =>
+      holidayEventsForWindow(
+        app?.holidayCountry ?? null,
+        calendarWindow,
+        locale,
+      ),
+    [app?.holidayCountry, calendarWindow, locale],
   );
   const forecast = useMemo(
     () =>
-      app?.cycle
-        ? generateForecast(app.cycle, today, app.horizonMonths)
+      app?.cycleSettings && app.periodEntries.length > 0
+        ? generateForecast(
+            app.cycleSettings,
+            app.periodEntries,
+            today,
+            app.horizonMonths,
+            app.pastMonths,
+          )
         : null,
     [app, today],
   );
   const predictions = forecast?.predictions ?? [];
-  const validation = app?.cycle ? validateCycleInput(app.cycle, today) : null;
   const categorizedTrips = splitTrips(app?.trips ?? [], today);
-  const hasData = !!app?.cycle || (app?.trips.length ?? 0) > 0;
+  const sortedPeriodEntries = sortPeriodEntries(app?.periodEntries ?? []);
+  const hasCycleData = !!app?.cycleSettings && sortedPeriodEntries.length > 0;
+  const currentCycleLength = app?.cycleSettings
+    ? effectiveCycleLength(app.cycleSettings, sortedPeriodEntries)
+    : null;
+  const hasData =
+    !!app?.cycleSettings ||
+    sortedPeriodEntries.length > 0 ||
+    (app?.trips.length ?? 0) > 0;
 
   function updateApp(updater: (previous: AppState) => AppState) {
     setApp((previous) => {
@@ -720,15 +958,66 @@ export default function CyclePlanner() {
 
   function submitCycle(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const cycle = {
-      lastPeriodStart: cycleForm.lastPeriodStart,
+    const settings: CycleSettings = {
       cycleLengthDays: Number(cycleForm.cycleLengthDays),
       periodLengthDays: Number(cycleForm.periodLengthDays),
     };
-    const result = validateCycleInput(cycle, today);
+    const result = validateCycleSettings(settings);
     setCycleErrors(result.errors);
     if (result.errors.length) return;
-    updateApp((previous) => ({ ...previous, cycle }));
+    updateApp((previous) => ({ ...previous, cycleSettings: settings }));
+  }
+
+  function submitPeriod(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!app) return;
+    const settings: CycleSettings = {
+      cycleLengthDays: Number(cycleForm.cycleLengthDays),
+      periodLengthDays: Number(cycleForm.periodLengthDays),
+    };
+    const settingsResult = validateCycleSettings(settings);
+    const entryBase = {
+      startDate: periodForm.startDate,
+      periodLengthDays: Number(periodForm.periodLengthDays || cycleForm.periodLengthDays),
+    };
+    const original = editingPeriodId
+      ? app.periodEntries.find((entry) => entry.id === editingPeriodId)
+      : null;
+    const entryResult = validatePeriodEntry(
+      entryBase,
+      today,
+      app.periodEntries,
+      editingPeriodId,
+      !!original && original.startDate === entryBase.startDate,
+    );
+    setCycleErrors(settingsResult.errors);
+    setPeriodErrors(entryResult.errors);
+    if (settingsResult.errors.length || entryResult.errors.length) return;
+
+    const entry: PeriodEntry = {
+      id: editingPeriodId ?? createPeriodId(entryBase.startDate),
+      ...entryBase,
+    };
+    const neededPastMonths = pastMonthsForDate(entry.startDate, today);
+    updateApp((previous) => ({
+      ...previous,
+      cycleSettings: settings,
+      periodEntries: sortPeriodEntries(
+        editingPeriodId
+          ? previous.periodEntries.map((stored) =>
+              stored.id === editingPeriodId ? entry : stored,
+            )
+          : [...previous.periodEntries, entry],
+      ),
+      pastMonths:
+        neededPastMonths > previous.pastMonths
+          ? neededPastMonths
+          : previous.pastMonths,
+    }));
+    setPeriodForm({ ...EMPTY_PERIOD_FORM, periodLengthDays: String(entry.periodLengthDays) });
+    setEditingPeriodId(null);
+    setCycleErrors([]);
+    setPeriodErrors([]);
     if (isMobile) setDrawerOpen(false);
   }
 
@@ -766,6 +1055,27 @@ export default function CyclePlanner() {
     setTripErrors([]);
   }
 
+  function editPeriod(entry: PeriodEntry) {
+    selectPanelTab("cycle");
+    setEditingPeriodId(entry.id);
+    setPeriodForm({
+      startDate: entry.startDate,
+      periodLengthDays: String(entry.periodLengthDays),
+    });
+    setPeriodErrors([]);
+  }
+
+  function removePeriod(entry: PeriodEntry) {
+    updateApp((previous) => ({
+      ...previous,
+      periodEntries: previous.periodEntries.filter((stored) => stored.id !== entry.id),
+    }));
+    if (editingPeriodId === entry.id) {
+      setEditingPeriodId(null);
+      setPeriodForm(EMPTY_PERIOD_FORM);
+    }
+  }
+
   function removeTrip(trip: Trip) {
     updateApp((previous) => ({
       ...previous,
@@ -777,7 +1087,7 @@ export default function CyclePlanner() {
     }
   }
 
-  function updateSettings(patch: Partial<Pick<AppState, "horizonMonths" | "visibleLayers">>) {
+  function updateSettings(patch: Partial<Pick<AppState, "horizonMonths" | "pastMonths" | "visibleLayers">>) {
     updateApp((previous) => ({ ...previous, ...patch }));
   }
 
@@ -791,24 +1101,47 @@ export default function CyclePlanner() {
     });
   }
 
+  function changeHolidayCountry(countryCode: string) {
+    updateApp((previous) => ({
+      ...previous,
+      holidayCountry: countryCode || null,
+      visibleLayers: {
+        ...previous.visibleLayers,
+        holidays: countryCode ? previous.visibleLayers.holidays : false,
+      },
+    }));
+  }
+
   function clearCycleOnly() {
-    updateApp((previous) => ({ ...previous, cycle: null }));
+    updateApp((previous) => ({
+      ...previous,
+      cycleSettings: null,
+      periodEntries: [],
+    }));
     setCycleForm(EMPTY_CYCLE_FORM);
+    setPeriodForm(EMPTY_PERIOD_FORM);
+    setEditingPeriodId(null);
     setCycleErrors([]);
+    setPeriodErrors([]);
     setShowDelete(false);
   }
 
   function clearEverything() {
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(LEGACY_V3_STORAGE_KEY);
+    localStorage.removeItem(LEGACY_V2_STORAGE_KEY);
     localStorage.removeItem(LEGACY_STORAGE_KEY);
     localStorage.removeItem(LOCALE_KEY);
     localStorage.removeItem(PANEL_TAB_KEY);
     const reset = defaultAppState(detectLocale());
     setApp(reset);
     setCycleForm(EMPTY_CYCLE_FORM);
+    setPeriodForm(EMPTY_PERIOD_FORM);
     setTripForm(EMPTY_TRIP_FORM);
+    setEditingPeriodId(null);
     setEditingTripId(null);
     setCycleErrors([]);
+    setPeriodErrors([]);
     setTripErrors([]);
     setPanelTab("summary");
     setSelectedDate(null);
@@ -851,6 +1184,7 @@ export default function CyclePlanner() {
           startDate: prediction.periodStart,
           endDate: prediction.periodEnd,
         });
+        if (prediction.observed) continue;
         events.push({
           uid: `fertile-${prediction.fertileStart}@kalendarzyk`,
           summary: t.fertile,
@@ -865,13 +1199,23 @@ export default function CyclePlanner() {
         });
       }
     }
-    for (const trip of app.trips) {
+    for (const trip of app.trips.filter((item) => isTripVisible(item, calendarWindow))) {
       events.push({
         uid: `trip-${trip.id}@kalendarzyk`,
         summary: `${t.trips}: ${trip.name}`,
         startDate: trip.startDate,
         endDate: trip.endDate,
       });
+    }
+    if (app.visibleLayers.holidays) {
+      for (const holiday of holidayEvents) {
+        events.push({
+          uid: `${holiday.id}@kalendarzyk`,
+          summary: `${t.holidays}: ${holiday.name}`,
+          startDate: holiday.date,
+          endDate: holiday.date,
+        });
+      }
     }
     const ics = generateIcsCalendar(events);
     const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
@@ -889,6 +1233,9 @@ export default function CyclePlanner() {
   const nextFertile = forecast ? nextEvent(forecast, today, "fertile") : null;
 
   function renderCyclePanel() {
+    const minPeriodDate = addMonths(today, -3);
+    const periodLengthValue =
+      periodForm.periodLengthDays || cycleForm.periodLengthDays;
     return (
       <aside className="form-panel">
         <div className="section-heading">
@@ -896,10 +1243,7 @@ export default function CyclePlanner() {
           <p>{t.formIntro}</p>
         </div>
         <form onSubmit={submitCycle} noValidate>
-          <label>
-            {t.lastPeriod}
-            <input type="date" max={today} value={cycleForm.lastPeriodStart} onChange={(event) => setCycleForm({ ...cycleForm, lastPeriodStart: event.target.value })} />
-          </label>
+          <h3 className="form-subtitle">{t.cycleSettingsTitle}</h3>
           <div className="two-inputs number-inputs">
             <label>
               {t.cycleLength}
@@ -909,7 +1253,7 @@ export default function CyclePlanner() {
               </span>
             </label>
             <label>
-              {t.periodLength}
+              {t.defaultPeriodLength}
               <span className="number-field">
                 <input type="number" min={1} max={14} value={cycleForm.periodLengthDays} onChange={(event) => setCycleForm({ ...cycleForm, periodLengthDays: event.target.value })} />
                 <small>{t.days}</small>
@@ -921,8 +1265,62 @@ export default function CyclePlanner() {
               {cycleErrors.map((error) => <p key={error}>{t.validation[error as keyof typeof t.validation]}</p>)}
             </div>
           )}
-          <button className="primary-button" type="submit">{forecast ? t.update : t.calculate}</button>
+          <button className="secondary-button" type="submit">{t.saveCycleSettings}</button>
         </form>
+        <form className="period-form" onSubmit={submitPeriod} noValidate>
+          <div className="form-subtitle-row">
+            <h3 className="form-subtitle">{t.periodHistoryTitle}</h3>
+            <small>{t.periodHistoryLimit}</small>
+          </div>
+          <label>
+            {t.periodStart}
+            <input
+              type="date"
+              min={editingPeriodId ? undefined : minPeriodDate}
+              max={today}
+              value={periodForm.startDate}
+              onChange={(event) => setPeriodForm({ ...periodForm, startDate: event.target.value })}
+            />
+          </label>
+          <label>
+            {t.entryPeriodLength}
+            <span className="number-field">
+              <input
+                type="number"
+                min={1}
+                max={14}
+                value={periodLengthValue}
+                onChange={(event) => setPeriodForm({ ...periodForm, periodLengthDays: event.target.value })}
+              />
+              <small>{t.days}</small>
+            </span>
+          </label>
+          {periodErrors.length > 0 && (
+            <div className="form-errors" role="alert">
+              {periodErrors.map((error) => <p key={error}>{t.validation[error as keyof typeof t.validation]}</p>)}
+            </div>
+          )}
+          <div className="trip-form-actions">
+            <button className="primary-button" type="submit">{editingPeriodId ? t.savePeriod : t.addPeriod}</button>
+            {editingPeriodId && (
+              <button className="secondary-button" type="button" onClick={() => { setEditingPeriodId(null); setPeriodForm(EMPTY_PERIOD_FORM); setPeriodErrors([]); }}>
+                {t.stopEditing}
+              </button>
+            )}
+          </div>
+        </form>
+        <section className="period-list-section">
+          <h3>{t.savedPeriods}</h3>
+          {sortedPeriodEntries.length > 0 ? (
+            <ul className="trip-list">
+              {sortedPeriodEntries.map((entry) => (
+                <PeriodItem key={entry.id} entry={entry} locale={locale} onEdit={editPeriod} onRemove={removePeriod} />
+              ))}
+            </ul>
+          ) : (
+            <p className="no-trips">{t.noPeriods}</p>
+          )}
+        </section>
         <p className="privacy-note"><LockKeyhole size={15} />{t.privacy}</p>
       </aside>
     );
@@ -978,7 +1376,16 @@ export default function CyclePlanner() {
           {categorizedTrips.planned.length > 0 ? (
             <ul className="trip-list">
               {categorizedTrips.planned.map((trip) => (
-                <TripItem key={trip.id} trip={trip} locale={locale} window={calendarWindow} overlap={forecast ? tripOverlapLayers(trip, predictions) : []} onEdit={editTrip} onRemove={removeTrip} />
+                <TripItem
+                  key={trip.id}
+                  trip={trip}
+                  locale={locale}
+                  window={calendarWindow}
+                  overlap={forecast ? tripOverlapLayers(trip, predictions) : []}
+                  readiness={tripReadiness(trip, predictions, holidayEvents, app?.cycleSettings ?? null, sortedPeriodEntries)}
+                  onEdit={editTrip}
+                  onRemove={removeTrip}
+                />
               ))}
             </ul>
           ) : (
@@ -989,7 +1396,16 @@ export default function CyclePlanner() {
               <summary><ChevronDown size={15} />{t.pastTrips} ({categorizedTrips.past.length})</summary>
               <ul className="trip-list">
                 {categorizedTrips.past.map((trip) => (
-                  <TripItem key={trip.id} trip={trip} locale={locale} window={calendarWindow} overlap={forecast ? tripOverlapLayers(trip, predictions) : []} onEdit={editTrip} onRemove={removeTrip} />
+                  <TripItem
+                    key={trip.id}
+                    trip={trip}
+                    locale={locale}
+                    window={calendarWindow}
+                    overlap={forecast ? tripOverlapLayers(trip, predictions) : []}
+                    readiness={tripReadiness(trip, predictions, holidayEvents, app?.cycleSettings ?? null, sortedPeriodEntries)}
+                    onEdit={editTrip}
+                    onRemove={removeTrip}
+                  />
                 ))}
               </ul>
             </details>
@@ -1012,6 +1428,12 @@ export default function CyclePlanner() {
       8: t.months8,
       12: t.months12,
     };
+    const pastLabels: Record<PastMonths, string> = {
+      0: t.pastMonths0,
+      1: t.pastMonths1,
+      2: t.pastMonths2,
+      3: t.pastMonths3,
+    };
     return (
       <section className="summary-panel">
         <div className="summary-intro">
@@ -1029,24 +1451,53 @@ export default function CyclePlanner() {
             ))}
           </div>
         </fieldset>
+        <fieldset>
+          <legend>{t.showPastMonths}</legend>
+          <div className="segmented horizon-picker">
+            {([0, 1, 2, 3] as PastMonths[]).map((months) => (
+              <button aria-label={pastLabels[months]} aria-pressed={current.pastMonths === months} className={current.pastMonths === months ? "active" : ""} key={months} onClick={() => updateSettings({ pastMonths: months })} type="button">
+                {months}
+              </button>
+            ))}
+          </div>
+        </fieldset>
         <fieldset className="layer-toggles">
           <legend>{t.layers}</legend>
-          {(current.cycle ? (["period", "fertile", "ovulation", "trips"] as Layer[]) : (["trips"] as Layer[])).map((layer) => (
+          {(hasCycleData ? (["period", "fertile", "ovulation", "trips"] as Layer[]) : (["trips"] as Layer[])).map((layer) => (
             <label className={`toggle toggle-${layer}`} key={layer}>
               <input checked={current.visibleLayers[layer]} onChange={() => toggleLayer(layer)} type="checkbox" />
               <LayerIcon layer={layer} size={14} />
               {layerName(locale, layer)}
             </label>
           ))}
+          <div className="holiday-settings">
+            <label>
+              {t.holidayCountry}
+              <select value={current.holidayCountry ?? ""} onChange={(event) => changeHolidayCountry(event.target.value)}>
+                <option value="">{t.noHolidayCountry}</option>
+                {holidayCountryOptions.map((country) => (
+                  <option key={country.code} value={country.code}>
+                    {country.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="toggle toggle-holidays">
+              <input
+                checked={current.visibleLayers.holidays}
+                disabled={!current.holidayCountry}
+                onChange={() => toggleLayer("holidays")}
+                type="checkbox"
+              />
+              <LayerIcon layer="holidays" size={14} />
+              {t.showHolidays}
+            </label>
+            <p>{t.holidayDisclaimer}</p>
+          </div>
         </fieldset>
         {forecast ? (
           <>
-            <div className="summary-highlights">
-              <article><Droplets size={17} /><span>{t.nextPeriod}</span><strong>{nextPeriod ? formatRange(nextPeriod.periodStart, nextPeriod.periodEnd, locale) : "-"}</strong></article>
-              <article><Sparkles size={17} /><span>{t.nextOvulation}</span><strong>{nextOvulation ? formatDate(nextOvulation.start, locale) : "-"}</strong></article>
-              <article><Leaf size={17} /><span>{t.nextFertile}</span><strong>{nextFertile ? formatRange(nextFertile.start, nextFertile.end, locale) : "-"}</strong></article>
-            </div>
-            {validation?.atypicalCycle && <div className="warning" role="note"><Info size={18} /><p>{t.atypical}</p></div>}
+            {currentCycleLength !== null && (currentCycleLength < 21 || currentCycleLength > 35) && <div className="warning" role="note"><Info size={18} /><p>{t.atypical}</p></div>}
 
           </>
         ) : (
@@ -1095,7 +1546,7 @@ export default function CyclePlanner() {
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">
-            <CycleCompassLogo />
+            <MoonBloomLogo />
           </span>
           <strong className="brand-name">{t.appName}</strong>
         </div>
@@ -1117,16 +1568,22 @@ export default function CyclePlanner() {
         <section className="results" aria-live="polite">
           <div className="result-toolbar">
             <h2>{t.calendar}</h2>
+            <ForecastChips
+              locale={locale}
+              nextFertile={nextFertile}
+              nextOvulation={nextOvulation}
+              nextPeriod={forecast ? nextPeriod : null}
+            />
             <button className="mobile-manage-button" onClick={() => openDrawer()} type="button" aria-label={t.managePlans}><Settings2 size={18} /><span>{t.managePlans}</span></button>
           </div>
           <div className="forecast-report" ref={reportRef}>
             <div aria-hidden="true" className="capture-header"><h2>{t.calendar}</h2></div>
             <div className="months">
               {calendarWindow.months.map((month) => (
-                <CalendarMonth key={month} month={month} predictions={predictions} trips={app.trips} layers={app.visibleLayers} locale={locale} today={today} isMobile={isMobile} selectedDate={selectedDate} onSelectDate={(date) => setSelectedDate((selected) => selected === date ? null : date)} />
+                <CalendarMonth key={month} month={month} predictions={predictions} trips={app.trips} holidays={holidayEvents} layers={app.visibleLayers} locale={locale} today={today} isMobile={isMobile} selectedDate={selectedDate} onSelectDate={(date) => setSelectedDate((selected) => selected === date ? null : date)} />
               ))}
             </div>
-            <Legend locale={locale} layers={app.visibleLayers} hasCycle={!!app.cycle} />
+            <Legend locale={locale} layers={app.visibleLayers} hasCycle={hasCycleData} hasHolidays={!!app.holidayCountry} />
             <p className="calendar-footnote"><LockKeyhole size={14} />{t.calendarFootnote}</p>
           </div>
         </section>
@@ -1163,7 +1620,7 @@ export default function CyclePlanner() {
             <p>{t.removeText}</p>
             <div className="modal-actions delete-options">
               <button type="button" onClick={() => setShowDelete(false)}>{t.cancel}</button>
-              {app.cycle && <button type="button" onClick={clearCycleOnly}>{t.deleteCycle}</button>}
+              {(app.cycleSettings || app.periodEntries.length > 0) && <button type="button" onClick={clearCycleOnly}>{t.deleteCycle}</button>}
               <button className="danger" onClick={clearEverything} type="button">{t.deleteAll}</button>
             </div>
           </section>

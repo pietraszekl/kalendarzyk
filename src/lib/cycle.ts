@@ -1,7 +1,8 @@
 export type Locale = "pl" | "en";
 export type HorizonMonths = 2 | 4 | 8 | 12;
+export type PastMonths = 0 | 1 | 2 | 3;
 export type CycleLayer = "period" | "fertile" | "ovulation";
-export type Layer = CycleLayer | "trips";
+export type Layer = CycleLayer | "trips" | "holidays";
 
 export type VisibleLayers = Record<Layer, boolean>;
 type LegacyVisibleLayers = Record<CycleLayer, boolean>;
@@ -9,6 +10,17 @@ type LegacyVisibleLayers = Record<CycleLayer, boolean>;
 export interface CycleInput {
   lastPeriodStart: string;
   cycleLengthDays: number;
+  periodLengthDays: number;
+}
+
+export interface CycleSettings {
+  cycleLengthDays: number;
+  periodLengthDays: number;
+}
+
+export interface PeriodEntry {
+  id: string;
+  startDate: string;
   periodLengthDays: number;
 }
 
@@ -26,12 +38,35 @@ export interface LegacySettings extends CycleInput {
   visibleLayers: LegacyVisibleLayers;
 }
 
-export interface AppState {
+export interface LegacyAppStateV2 {
   storageVersion: 2;
   cycle: CycleInput | null;
   trips: Trip[];
   locale: Locale;
   horizonMonths: HorizonMonths;
+  visibleLayers: VisibleLayers;
+}
+
+export interface LegacyAppStateV3 {
+  storageVersion: 3;
+  cycleSettings: CycleSettings | null;
+  periodEntries: PeriodEntry[];
+  trips: Trip[];
+  locale: Locale;
+  horizonMonths: HorizonMonths;
+  pastMonths: PastMonths;
+  visibleLayers: Omit<VisibleLayers, "holidays">;
+}
+
+export interface AppState {
+  storageVersion: 4;
+  cycleSettings: CycleSettings | null;
+  periodEntries: PeriodEntry[];
+  trips: Trip[];
+  locale: Locale;
+  horizonMonths: HorizonMonths;
+  pastMonths: PastMonths;
+  holidayCountry: string | null;
   visibleLayers: VisibleLayers;
 }
 
@@ -41,6 +76,7 @@ export interface CyclePrediction {
   ovulation: string;
   fertileStart: string;
   fertileEnd: string;
+  observed?: boolean;
 }
 
 export interface CalendarWindow {
@@ -55,6 +91,36 @@ export interface CalendarBarEvent {
   label: string;
   startDate: string;
   endDate: string;
+}
+
+export interface HolidayCountry {
+  code: string;
+  name: string;
+}
+
+export interface HolidayEvent {
+  id: string;
+  countryCode: string;
+  name: string;
+  date: string;
+  type: "public" | "bank";
+}
+
+export type ForecastConfidence = "high" | "medium" | "low";
+export type PreparationHint =
+  | "periodKit"
+  | "comfortItems"
+  | "backupSupplies"
+  | "travelTiming";
+
+export interface TripReadiness {
+  tripId: string;
+  cycleOverlaps: CycleLayer[];
+  observedPeriodOverlap: boolean;
+  predictedPeriodOverlap: boolean;
+  holidayOverlaps: HolidayEvent[];
+  forecastConfidence: ForecastConfidence;
+  preparationHints: PreparationHint[];
 }
 
 export interface CalendarBarSegment extends CalendarBarEvent {
@@ -84,6 +150,10 @@ export interface ValidationResult {
   atypicalCycle: boolean;
 }
 
+export interface PeriodEntryValidationResult {
+  errors: string[];
+}
+
 export interface TripValidationResult {
   errors: string[];
 }
@@ -93,15 +163,19 @@ export const DEFAULT_LAYERS: VisibleLayers = {
   fertile: true,
   ovulation: true,
   trips: true,
+  holidays: true,
 };
 
 export function defaultAppState(locale: Locale): AppState {
   return {
-    storageVersion: 2,
-    cycle: null,
+    storageVersion: 4,
+    cycleSettings: null,
+    periodEntries: [],
     trips: [],
     locale,
     horizonMonths: 4,
+    pastMonths: 0,
+    holidayCountry: locale === "pl" ? "PL" : null,
     visibleLayers: { ...DEFAULT_LAYERS },
   };
 }
@@ -142,16 +216,24 @@ export function endOfMonth(value: string): string {
   return toDateKey(date);
 }
 
-export function monthKeys(today: string, horizon: HorizonMonths): string[] {
-  const first = startOfMonth(today);
-  return Array.from({ length: horizon }, (_, index) => addMonths(first, index));
+export function monthKeys(
+  today: string,
+  horizon: HorizonMonths,
+  pastMonths: PastMonths = 0,
+): string[] {
+  const first = addMonths(startOfMonth(today), -pastMonths);
+  return Array.from(
+    { length: horizon + pastMonths },
+    (_, index) => addMonths(first, index),
+  );
 }
 
 export function createCalendarWindow(
   today: string,
   horizon: HorizonMonths,
+  pastMonths: PastMonths = 0,
 ): CalendarWindow {
-  const months = monthKeys(today, horizon);
+  const months = monthKeys(today, horizon, pastMonths);
   return {
     months,
     viewStart: months[0],
@@ -212,6 +294,70 @@ export function validateCycleInput(
   };
 }
 
+export function validateCycleSettings(
+  settings: CycleSettings,
+): ValidationResult {
+  const errors: string[] = [];
+  if (
+    !Number.isInteger(settings.cycleLengthDays) ||
+    settings.cycleLengthDays < 15 ||
+    settings.cycleLengthDays > 90
+  ) {
+    errors.push("cycleRange");
+  }
+  if (
+    !Number.isInteger(settings.periodLengthDays) ||
+    settings.periodLengthDays < 1 ||
+    settings.periodLengthDays > 14
+  ) {
+    errors.push("periodRange");
+  }
+  if (settings.periodLengthDays > settings.cycleLengthDays) {
+    errors.push("periodLongerThanCycle");
+  }
+  return {
+    errors,
+    atypicalCycle:
+      settings.cycleLengthDays < 21 || settings.cycleLengthDays > 35,
+  };
+}
+
+export function validatePeriodEntry(
+  entry: Pick<PeriodEntry, "startDate" | "periodLengthDays">,
+  today: string,
+  existingEntries: PeriodEntry[] = [],
+  editingId: string | null = null,
+  allowOldStart = false,
+): PeriodEntryValidationResult {
+  const errors: string[] = [];
+  if (!entry.startDate) errors.push("periodStartRequired");
+  if (entry.startDate && entry.startDate > today) errors.push("futureStart");
+  if (
+    entry.startDate &&
+    !allowOldStart &&
+    entry.startDate < addMonths(today, -3)
+  ) {
+    errors.push("periodStartTooOld");
+  }
+  if (
+    !Number.isInteger(entry.periodLengthDays) ||
+    entry.periodLengthDays < 1 ||
+    entry.periodLengthDays > 14
+  ) {
+    errors.push("periodRange");
+  }
+  if (
+    entry.startDate &&
+    existingEntries.some(
+      (stored) =>
+        stored.startDate === entry.startDate && stored.id !== editingId,
+    )
+  ) {
+    errors.push("periodDuplicate");
+  }
+  return { errors };
+}
+
 export function validateTrip(
   trip: Pick<Trip, "name" | "startDate" | "endDate">,
   today: string,
@@ -234,20 +380,94 @@ export function validateTrip(
   return { errors };
 }
 
+export function sortPeriodEntries(entries: PeriodEntry[]): PeriodEntry[] {
+  return [...entries].sort((first, second) =>
+    first.startDate.localeCompare(second.startDate),
+  );
+}
+
+export function effectiveCycleLength(
+  settings: CycleSettings,
+  entries: PeriodEntry[],
+): number {
+  const sorted = sortPeriodEntries(entries);
+  const intervals: number[] = [];
+  for (let index = 1; index < sorted.length; index += 1) {
+    const interval = daysBetween(
+      sorted[index - 1].startDate,
+      sorted[index].startDate,
+    );
+    if (interval >= 15 && interval <= 90) intervals.push(interval);
+  }
+  if (intervals.length === 0) return settings.cycleLengthDays;
+  return Math.round(
+    intervals.reduce((sum, interval) => sum + interval, 0) / intervals.length,
+  );
+}
+
+export function pastMonthsForDate(
+  date: string,
+  today: string,
+): PastMonths {
+  const current = parseDateKey(startOfMonth(today));
+  const target = parseDateKey(startOfMonth(date));
+  const diff =
+    (current.getFullYear() - target.getFullYear()) * 12 +
+    current.getMonth() -
+    target.getMonth();
+  if (diff <= 0) return 0;
+  if (diff >= 3) return 3;
+  return diff as PastMonths;
+}
+
 export function generateForecast(
-  input: CycleInput,
+  settings: CycleSettings,
+  entries: PeriodEntry[],
   today: string,
   horizon: HorizonMonths,
+  pastMonths: PastMonths = 0,
 ): Forecast {
-  const window = createCalendarWindow(today, horizon);
+  const window = createCalendarWindow(today, horizon, pastMonths);
   const predictions: CyclePrediction[] = [];
-  let periodStart = input.lastPeriodStart;
+  const sortedEntries = sortPeriodEntries(entries);
+  const cycleLength = effectiveCycleLength(settings, sortedEntries);
+
+  for (let index = 0; index < sortedEntries.length; index += 1) {
+    const entry = sortedEntries[index];
+    const nextStart =
+      sortedEntries[index + 1]?.startDate ??
+      addDays(entry.startDate, cycleLength);
+    const prediction: CyclePrediction = {
+      periodStart: entry.startDate,
+      periodEnd: addDays(entry.startDate, entry.periodLengthDays - 1),
+      ovulation: addDays(nextStart, -14),
+      fertileStart: addDays(nextStart, -19),
+      fertileEnd: addDays(nextStart, -13),
+      observed: true,
+    };
+    if (
+      rangesIntersect(
+        prediction.periodStart,
+        prediction.periodEnd,
+        window.viewStart,
+        window.viewEnd,
+      )
+    ) {
+      predictions.push(prediction);
+    }
+  }
+
+  const latestEntry = sortedEntries[sortedEntries.length - 1];
+  if (!latestEntry) return { ...window, predictions, upcoming: [] };
+
+  let periodStart = addDays(latestEntry.startDate, cycleLength);
+  const periodLength = latestEntry.periodLengthDays || settings.periodLengthDays;
 
   for (let iteration = 0; iteration < 3000; iteration += 1) {
-    const nextPeriodStart = addDays(periodStart, input.cycleLengthDays);
+    const nextPeriodStart = addDays(periodStart, cycleLength);
     const prediction: CyclePrediction = {
       periodStart,
-      periodEnd: addDays(periodStart, input.periodLengthDays - 1),
+      periodEnd: addDays(periodStart, periodLength - 1),
       ovulation: addDays(nextPeriodStart, -14),
       fertileStart: addDays(nextPeriodStart, -19),
       fertileEnd: addDays(nextPeriodStart, -13),
@@ -273,6 +493,7 @@ export function generateForecast(
 
   const upcoming = predictions.filter(
     (prediction) =>
+      !prediction.observed &&
       prediction.periodStart > today &&
       prediction.periodStart <= window.viewEnd,
   );
@@ -294,12 +515,17 @@ export function layersForDate(
   }
   if (
     predictions.some((prediction) =>
+      !prediction.observed &&
       isInRange(value, prediction.fertileStart, prediction.fertileEnd),
     )
   ) {
     layers.push("fertile");
   }
-  if (predictions.some((prediction) => prediction.ovulation === value)) {
+  if (
+    predictions.some(
+      (prediction) => !prediction.observed && prediction.ovulation === value,
+    )
+  ) {
     layers.push("ovulation");
   }
   return layers;
@@ -392,6 +618,7 @@ const BAR_LAYER_PRIORITY: Record<Layer, number> = {
   fertile: 1,
   ovulation: 2,
   trips: 3,
+  holidays: 4,
 };
 
 export function layoutCalendarBars(
@@ -482,6 +709,7 @@ export function tripOverlapLayers(
   const overlap = new Set<CycleLayer>();
   for (const prediction of predictions) {
     if (
+      !prediction.observed &&
       rangesIntersect(
         trip.startDate,
         trip.endDate,
@@ -501,13 +729,90 @@ export function tripOverlapLayers(
     ) {
       overlap.add("fertile");
     }
-    if (isInRange(prediction.ovulation, trip.startDate, trip.endDate)) {
+    if (
+      !prediction.observed &&
+      isInRange(prediction.ovulation, trip.startDate, trip.endDate)
+    ) {
       overlap.add("ovulation");
     }
   }
   return ["period", "fertile", "ovulation"].filter((layer) =>
     overlap.has(layer as CycleLayer),
   ) as CycleLayer[];
+}
+
+export function forecastConfidence(
+  settings: CycleSettings | null,
+  entries: PeriodEntry[],
+): ForecastConfidence {
+  if (!settings || entries.length < 2) return "low";
+  const sorted = sortPeriodEntries(entries);
+  const intervals: number[] = [];
+  for (let index = 1; index < sorted.length; index += 1) {
+    const interval = daysBetween(
+      sorted[index - 1].startDate,
+      sorted[index].startDate,
+    );
+    if (interval >= 15 && interval <= 90) intervals.push(interval);
+  }
+  if (intervals.length < 1) return "low";
+  const spread = Math.max(...intervals) - Math.min(...intervals);
+  if (intervals.length >= 2 && spread <= 4) return "high";
+  if (spread <= 8) return "medium";
+  return "low";
+}
+
+export function tripReadiness(
+  trip: Trip,
+  predictions: CyclePrediction[],
+  holidays: HolidayEvent[],
+  settings: CycleSettings | null,
+  entries: PeriodEntry[],
+): TripReadiness {
+  const cycleOverlaps = tripOverlapLayers(trip, predictions);
+  const observedPeriodOverlap = predictions.some(
+    (prediction) =>
+      !!prediction.observed &&
+      rangesIntersect(
+        trip.startDate,
+        trip.endDate,
+        prediction.periodStart,
+        prediction.periodEnd,
+      ),
+  );
+  const predictedPeriodOverlap = predictions.some(
+    (prediction) =>
+      !prediction.observed &&
+      rangesIntersect(
+        trip.startDate,
+        trip.endDate,
+        prediction.periodStart,
+        prediction.periodEnd,
+      ),
+  );
+  const holidayOverlaps = holidays.filter((holiday) =>
+    isInRange(holiday.date, trip.startDate, trip.endDate),
+  );
+  const preparationHints = new Set<PreparationHint>();
+  if (observedPeriodOverlap || predictedPeriodOverlap) {
+    preparationHints.add("periodKit");
+    preparationHints.add("comfortItems");
+    preparationHints.add("backupSupplies");
+  }
+  if (holidayOverlaps.length > 0) preparationHints.add("travelTiming");
+  if (forecastConfidence(settings, entries) === "low" && cycleOverlaps.length > 0) {
+    preparationHints.add("backupSupplies");
+  }
+
+  return {
+    tripId: trip.id,
+    cycleOverlaps,
+    observedPeriodOverlap,
+    predictedPeriodOverlap,
+    holidayOverlaps,
+    forecastConfidence: forecastConfidence(settings, entries),
+    preparationHints: Array.from(preparationHints),
+  };
 }
 
 export interface IcsEvent {
@@ -552,6 +857,11 @@ function normalizeHorizon(value: unknown): HorizonMonths | null {
   return null;
 }
 
+function normalizePastMonths(value: unknown): PastMonths | null {
+  if (value === 0 || value === 1 || value === 2 || value === 3) return value;
+  return null;
+}
+
 function isCycle(value: unknown): value is CycleInput {
   if (!value || typeof value !== "object") return false;
   const cycle = value as Partial<CycleInput>;
@@ -559,6 +869,25 @@ function isCycle(value: unknown): value is CycleInput {
     typeof cycle.lastPeriodStart === "string" &&
     typeof cycle.cycleLengthDays === "number" &&
     typeof cycle.periodLengthDays === "number"
+  );
+}
+
+function isCycleSettings(value: unknown): value is CycleSettings {
+  if (!value || typeof value !== "object") return false;
+  const settings = value as Partial<CycleSettings>;
+  return (
+    typeof settings.cycleLengthDays === "number" &&
+    typeof settings.periodLengthDays === "number"
+  );
+}
+
+function isPeriodEntry(value: unknown): value is PeriodEntry {
+  if (!value || typeof value !== "object") return false;
+  const entry = value as Partial<PeriodEntry>;
+  return (
+    typeof entry.id === "string" &&
+    typeof entry.startDate === "string" &&
+    typeof entry.periodLengthDays === "number"
   );
 }
 
@@ -573,14 +902,19 @@ function isTrip(value: unknown): value is Trip {
   );
 }
 
-function isLayers(value: unknown, includeTrips: boolean): boolean {
+function isLayers(
+  value: unknown,
+  includeTrips: boolean,
+  includeHolidays = false,
+): boolean {
   if (!value || typeof value !== "object") return false;
   const layers = value as Partial<VisibleLayers>;
   return (
     typeof layers.period === "boolean" &&
     typeof layers.fertile === "boolean" &&
     typeof layers.ovulation === "boolean" &&
-    (!includeTrips || typeof layers.trips === "boolean")
+    (!includeTrips || typeof layers.trips === "boolean") &&
+    (!includeHolidays || typeof layers.holidays === "boolean")
   );
 }
 
@@ -588,17 +922,104 @@ export function migrateStoredState(value: unknown): AppState | null {
   if (!value || typeof value !== "object") return null;
   const current = value as Partial<AppState>;
   const currentHorizon = normalizeHorizon(current.horizonMonths);
+  const currentPastMonths = normalizePastMonths(current.pastMonths);
   if (
-    current.storageVersion === 2 &&
-    (current.cycle === null || isCycle(current.cycle)) &&
+    current.storageVersion === 4 &&
+    (current.cycleSettings === null ||
+      isCycleSettings(current.cycleSettings)) &&
+    Array.isArray(current.periodEntries) &&
+    current.periodEntries.every(isPeriodEntry) &&
     Array.isArray(current.trips) &&
     current.trips.every(isTrip) &&
     isLocale(current.locale) &&
     currentHorizon !== null &&
-    isLayers(current.visibleLayers, true)
+    currentPastMonths !== null &&
+    (current.holidayCountry === null ||
+      typeof current.holidayCountry === "string") &&
+    isLayers(current.visibleLayers, true, true)
   ) {
-    return { ...current, horizonMonths: currentHorizon } as AppState;
+    return {
+      ...current,
+      horizonMonths: currentHorizon,
+      pastMonths: currentPastMonths,
+      holidayCountry: current.holidayCountry ?? null,
+      periodEntries: sortPeriodEntries(current.periodEntries),
+      visibleLayers: current.visibleLayers as VisibleLayers,
+    } as AppState;
   }
+
+  const previousV3 = value as Partial<LegacyAppStateV3>;
+  const previousV3Horizon = normalizeHorizon(previousV3.horizonMonths);
+  const previousV3PastMonths = normalizePastMonths(previousV3.pastMonths);
+  if (
+    previousV3.storageVersion === 3 &&
+    (previousV3.cycleSettings === null ||
+      isCycleSettings(previousV3.cycleSettings)) &&
+    Array.isArray(previousV3.periodEntries) &&
+    previousV3.periodEntries.every(isPeriodEntry) &&
+    Array.isArray(previousV3.trips) &&
+    previousV3.trips.every(isTrip) &&
+    isLocale(previousV3.locale) &&
+    previousV3Horizon !== null &&
+    previousV3PastMonths !== null &&
+    isLayers(previousV3.visibleLayers, true)
+  ) {
+    return {
+      storageVersion: 4,
+      cycleSettings: previousV3.cycleSettings,
+      periodEntries: sortPeriodEntries(previousV3.periodEntries),
+      trips: previousV3.trips,
+      locale: previousV3.locale,
+      horizonMonths: previousV3Horizon,
+      pastMonths: previousV3PastMonths,
+      holidayCountry: previousV3.locale === "pl" ? "PL" : null,
+      visibleLayers: {
+        ...(previousV3.visibleLayers as Omit<VisibleLayers, "holidays">),
+        holidays: true,
+      },
+    };
+  }
+
+  const previous = value as Partial<LegacyAppStateV2>;
+  const previousHorizon = normalizeHorizon(previous.horizonMonths);
+  if (
+    previous.storageVersion === 2 &&
+    (previous.cycle === null || isCycle(previous.cycle)) &&
+    Array.isArray(previous.trips) &&
+    previous.trips.every(isTrip) &&
+    isLocale(previous.locale) &&
+    previousHorizon !== null &&
+    isLayers(previous.visibleLayers, true)
+  ) {
+    return {
+      storageVersion: 4,
+      cycleSettings: previous.cycle
+        ? {
+            cycleLengthDays: previous.cycle.cycleLengthDays,
+            periodLengthDays: previous.cycle.periodLengthDays,
+          }
+        : null,
+      periodEntries: previous.cycle
+        ? [
+            {
+              id: `period-${previous.cycle.lastPeriodStart}`,
+              startDate: previous.cycle.lastPeriodStart,
+              periodLengthDays: previous.cycle.periodLengthDays,
+            },
+          ]
+        : [],
+      trips: previous.trips,
+      locale: previous.locale,
+      horizonMonths: previousHorizon,
+      pastMonths: 0,
+      holidayCountry: previous.locale === "pl" ? "PL" : null,
+      visibleLayers: {
+        ...(previous.visibleLayers as Omit<VisibleLayers, "holidays">),
+        holidays: true,
+      },
+    };
+  }
+
   const legacy = value as Partial<LegacySettings>;
   const legacyHorizon = normalizeHorizon(legacy.horizonMonths);
   const legacyCycle = {
@@ -614,12 +1035,28 @@ export function migrateStoredState(value: unknown): AppState | null {
     isLayers(legacy.visibleLayers, false)
   ) {
     return {
-      storageVersion: 2,
-      cycle: legacyCycle,
+      storageVersion: 4,
+      cycleSettings: {
+        cycleLengthDays: legacyCycle.cycleLengthDays,
+        periodLengthDays: legacyCycle.periodLengthDays,
+      },
+      periodEntries: [
+        {
+          id: `period-${legacyCycle.lastPeriodStart}`,
+          startDate: legacyCycle.lastPeriodStart,
+          periodLengthDays: legacyCycle.periodLengthDays,
+        },
+      ],
       trips: [],
       locale: legacy.locale,
       horizonMonths: legacyHorizon,
-      visibleLayers: { ...legacy.visibleLayers, trips: true } as VisibleLayers,
+      pastMonths: 0,
+      holidayCountry: legacy.locale === "pl" ? "PL" : null,
+      visibleLayers: {
+        ...legacy.visibleLayers,
+        trips: true,
+        holidays: true,
+      } as VisibleLayers,
     };
   }
   return null;
