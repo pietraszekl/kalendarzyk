@@ -162,6 +162,36 @@ export const copy = {
         "Data zakończenia wyjazdu nie może być wcześniejsza niż data rozpoczęcia.",
     },
     weekdays: ["Pn", "Wt", "Śr", "Cz", "Pt", "Sb", "Nd"],
+    onboarding: {
+      next: "Dalej",
+      prev: "Wstecz",
+      skip: "Pomiń",
+      done: "Gotowe",
+      welcomeTitle: "Witaj w Cycle Compass",
+      welcomeText:
+        "Pokażę Ci w kilku krokach, jak korzystać z aplikacji. Cykl i wyjazdy zapisujemy tylko w Twojej przeglądarce — nigdy nie trafiają do nas.",
+      manageTitle: "Twoje dane są tutaj",
+      manageText:
+        "Tutaj zarządzasz cyklem i wyjazdami. Otwórz panel, żeby przejść dalej.",
+      cycleTabTitle: "Zakładka „Cykl”",
+      cycleTabText:
+        "Przejdź do zakładki Cykl, aby zapisać swoje typowe parametry i daty miesiączek.",
+      cycleLengthTitle: "Typowa długość cyklu",
+      cycleLengthText:
+        "Wpisz średnią długość Twojego cyklu w dniach (od pierwszego dnia miesiączki do następnego). Zwykle 21–35 dni.",
+      periodLengthTitle: "Typowa długość krwawienia",
+      periodLengthText:
+        "Ile dni zwykle trwa Twoja miesiączka? Najczęściej 3–7 dni.",
+      firstDayTitle: "Pierwszy dzień ostatniej miesiączki",
+      firstDayText:
+        "Wybierz dokładną datę — od tego punktu wyznaczymy prognozę. Możesz dodać też wcześniejsze miesiączki, żeby uściślić prognozę.",
+      tripsTitle: "Planuj wyjazdy",
+      tripsText:
+        "W zakładce Wyjazdy dodajesz podróże — zobaczysz na kalendarzu, czy nie nakładają się na miesiączkę lub okno płodne.",
+      doneTitle: "To wszystko!",
+      doneText:
+        "Gotowe — masz wszystko, czego potrzeba. W każdej chwili możesz wrócić tu i zaktualizować swoje dane. Powodzenia!",
+    },
   },
   en: {
     appName: "Cycle Compass",
@@ -323,6 +353,36 @@ export const copy = {
         "The trip end date cannot be earlier than its start date.",
     },
     weekdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    onboarding: {
+      next: "Next",
+      prev: "Back",
+      skip: "Skip",
+      done: "Done",
+      welcomeTitle: "Welcome to Cycle Compass",
+      welcomeText:
+        "Let me walk you through the basics in a few quick steps. Your cycle and trip data live only in this browser — nothing is sent to us.",
+      manageTitle: "Your data lives here",
+      manageText:
+        "This is where you manage your cycle and trips. Open the panel to continue.",
+      cycleTabTitle: "The Cycle tab",
+      cycleTabText:
+        "Switch to the Cycle tab to save your typical settings and the dates of past periods.",
+      cycleLengthTitle: "Typical cycle length",
+      cycleLengthText:
+        "Enter the average length of your cycle in days (from the first day of one period to the next). Usually 21–35 days.",
+      periodLengthTitle: "Typical bleeding length",
+      periodLengthText:
+        "How many days does your period usually last? Most commonly 3–7 days.",
+      firstDayTitle: "First day of last period",
+      firstDayText:
+        "Pick the exact date — we anchor the forecast from this point. You can add earlier periods later to refine the prediction.",
+      tripsTitle: "Plan your trips",
+      tripsText:
+        "Use the Trips tab to log upcoming travel — the calendar will show whether they overlap with your period or fertile window.",
+      doneTitle: "All set!",
+      doneText:
+        "You're ready to go. Come back any time to update your data. Have a good one!",
+    },
   },
 } as const;
 

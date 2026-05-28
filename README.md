@@ -8,11 +8,12 @@ Cycle Compass helps users plan trips and, if they choose, overlay estimated peri
 
 - `Cycle Compass` is the English product name.
 - `Kalendarzyk` is the Polish product name.
-- The visible brand uses a custom compass-rose logo with cycle/travel color accents. The same visual direction is used for the app icon/favicons.
+- The logo is a compass disc with a blood-drop needle, reinforcing the "Cycle Compass" identity. The same visual is used for the app icon/favicons.
 - The UI is available in Polish and English, with the language choice saved locally.
 
 ## Features
 
+- First-time users are guided through an interactive onboarding tour (spotlight overlay with step-by-step popovers) that walks through cycle settings, period entry, and trip planning.
 - Add actual period starts from up to 3 months back and keep a local period history.
 - Forecast future period, ovulation, and fertile-window dates from saved history or fallback cycle settings.
 - Show a calendar window with configurable past months `0 / 1 / 2 / 3` and future range `2 / 4 / 8 / 12` months.
@@ -40,6 +41,7 @@ All cycle entries, trips, preferences, and holiday settings stay in `localStorag
 - `html-to-image` for PNG export
 - `date-holidays` for offline country-level public/bank holidays
 - `lucide-react` for interface icons
+- `driver.js` for the first-visit onboarding tour
 
 ## Getting Started
 

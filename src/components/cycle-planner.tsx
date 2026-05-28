@@ -69,6 +69,12 @@ import {
 } from "@/lib/cycle";
 import { holidayCountries, holidayEventsForWindow } from "@/lib/holidays";
 import { copy, dateLocale, layerName } from "@/lib/i18n";
+import {
+  ONBOARDING_KEY,
+  hasCompletedOnboarding,
+  markOnboardingComplete,
+  startOnboarding,
+} from "@/lib/onboarding";
 
 const STORAGE_KEY = "kalendarzyk.settings.v4";
 const LEGACY_V3_STORAGE_KEY = "kalendarzyk.settings.v3";
@@ -847,10 +853,34 @@ export default function CyclePlanner() {
 
   const locale = app?.locale ?? "pl";
   const t = copy[locale];
+  const onboardingStartedRef = useRef(false);
 
   useEffect(() => {
     if (ready) document.documentElement.lang = locale;
   }, [locale, ready]);
+
+  useEffect(() => {
+    if (!ready) return;
+    if (onboardingStartedRef.current) return;
+    if (hasCompletedOnboarding()) return;
+    // Skip if the user already has saved cycle data (returning user without flag).
+    if (localStorage.getItem(STORAGE_KEY)) {
+      markOnboardingComplete();
+      return;
+    }
+    onboardingStartedRef.current = true;
+    startOnboarding({
+      t,
+      isMobile,
+      openDrawer: (tab) => openDrawer(tab),
+      closeDrawer: () => setDrawerOpen(false),
+      selectPanelTab: (tab) => selectPanelTab(tab),
+      onComplete: markOnboardingComplete,
+    });
+    // Re-running only changes the language of an in-flight tour, which we
+    // don't support. The ref above guards against duplicate launches.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, isMobile, t]);
 
   useEffect(() => {
     if (!drawerOpen || !isMobile) return;
@@ -1133,6 +1163,7 @@ export default function CyclePlanner() {
     localStorage.removeItem(LEGACY_STORAGE_KEY);
     localStorage.removeItem(LOCALE_KEY);
     localStorage.removeItem(PANEL_TAB_KEY);
+    localStorage.removeItem(ONBOARDING_KEY);
     const reset = defaultAppState(detectLocale());
     setApp(reset);
     setCycleForm(EMPTY_CYCLE_FORM);

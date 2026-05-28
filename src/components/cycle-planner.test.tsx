@@ -18,6 +18,10 @@ beforeEach(() => {
   });
   setMobileViewport(false);
   vi.mocked(toPng).mockClear();
+  // Skip the first-visit onboarding tour in unit tests — it's covered by
+  // manual/preview verification, and starting it here interferes with the
+  // DOM assertions in other test cases.
+  localStorage.setItem("kalendarzyk.onboarded.v1", "true");
 });
 
 afterEach(() => {
