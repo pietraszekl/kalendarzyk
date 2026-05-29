@@ -34,7 +34,19 @@ Cycle Compass helps users plan trips and, if they choose, overlay estimated peri
 
 Cycle predictions are estimates. They are intended for orientation and travel preparation only, not contraception, diagnosis, or medical advice.
 
-All cycle entries, trips, preferences, and holiday settings stay in `localStorage` in the current browser. Exported PNG and `.ics` files may contain private information, so users control where those files are saved or shared.
+All cycle entries, trips, preferences, and holiday settings stay in `localStorage` in the current browser. Exported PNG and `.ics` files may contain private information, so users control where those files are saved or shared. Exports use a neutral `calendar-{date}` filename so the Downloads folder does not advertise the app.
+
+Defence-in-depth headers shipped with the app:
+- A strict Content-Security-Policy (`default-src 'self'`, no third-party scripts, fetches, fonts, frames or form posts)
+- `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`
+- A `Permissions-Policy` that disables every browser feature the app does not use (geolocation, camera, microphone, USB, FLoC/Topics, and more)
+- `Strict-Transport-Security` with preload
+
+Two privacy comforts are available from the Cycle tab:
+- **Discreet tab title** swaps the browser tab name to a neutral "Calendar" so the app is not visible in tab switchers or screen-shares.
+- **Panic clear** (`Ctrl/Cmd + Shift + L`) deletes every piece of local data after a single confirm.
+
+ICS exports escape every text field per RFC 5545 and use a neutral PRODID/UID domain so the file does not brand itself to whoever imports it.
 
 ## Tech Stack
 

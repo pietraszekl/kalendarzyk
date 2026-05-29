@@ -2235,3 +2235,45 @@ legend {
   0%, 100% { opacity: 0.4; }
   50%      { opacity: 0.85; }
 }
+
+/* Privacy section in the Cycle tab. Holds the discreet-title toggle and the
+   panic-clear hint. Same visual rhythm as the gentle-mode + reset-onboarding
+   blocks above it. */
+.privacy-mode {
+  background: rgb(255 255 255 / 55%);
+  border: 1px solid rgb(222 215 208 / 75%);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 12px 14px;
+}
+
+.privacy-mode h3 {
+  color: var(--accent);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.privacy-row {
+  align-items: center;
+  display: inline-flex;
+  gap: 10px;
+}
+
+.privacy-row-label {
+  color: var(--foreground);
+  font-size: 0.85rem;
+}
+
+.privacy-hint {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.privacy-hint strong {
+  color: var(--foreground);
+}

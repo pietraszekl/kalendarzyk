@@ -94,6 +94,7 @@ const LEGACY_STORAGE_KEY = "kalendarzyk.settings.v1";
 const LOCALE_KEY = "kalendarzyk.locale";
 const PANEL_TAB_KEY = "kalendarzyk.panelTab";
 const GENTLE_KEY = "kalendarzyk.gentle.v1";
+const DISCREET_KEY = "kalendarzyk.discreet.v1";
 const MOBILE_QUERY = "(max-width: 820px)";
 
 type PanelTab = "summary" | "trips" | "cycle";
@@ -291,8 +292,17 @@ function detectLocale(): Locale {
   return navigator.language.toLowerCase().startsWith("pl") ? "pl" : "en";
 }
 
-function persistState(state: AppState) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+function persistState(state: AppState): boolean {
+  // `setItem` throws when the browser quota is exceeded (e.g. Safari private
+  // mode has a 0-byte quota) or when localStorage is disabled by policy.
+  // We swallow the error rather than crashing the React tree — the next save
+  // attempt will try again, and the in-memory state is still accurate.
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function createTripId() {
@@ -934,6 +944,7 @@ export default function CyclePlanner() {
   const [panelTab, setPanelTab] = useState<PanelTab>("summary");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [gentle, setGentle] = useState<boolean>(true);
+  const [discreet, setDiscreet] = useState<boolean>(false);
   const reportRef = useRef<HTMLDivElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
   const drawerCloseRef = useRef<HTMLButtonElement>(null);
@@ -981,6 +992,8 @@ export default function CyclePlanner() {
     if (isPanelTab(savedPanelTab)) setPanelTab(savedPanelTab);
     const savedGentle = localStorage.getItem(GENTLE_KEY);
     if (savedGentle === "false") setGentle(false);
+    const savedDiscreet = localStorage.getItem(DISCREET_KEY);
+    if (savedDiscreet === "true") setDiscreet(true);
     if (initialState.cycleSettings) {
       setCycleForm({
         cycleLengthDays: String(initialState.cycleSettings.cycleLengthDays),
@@ -1004,10 +1017,49 @@ export default function CyclePlanner() {
     if (ready) document.documentElement.lang = locale;
   }, [locale, ready]);
 
+  // Discreet title: swap the browser tab title to a neutral string so the
+  // app's name (Kalendarzyk / Cycle Compass) is not visible in tab switchers
+  // or screen-shared windows. We restore the original title on cleanup so the
+  // toggle is symmetric — turning it off brings the real title back.
+  useEffect(() => {
+    if (!ready) return;
+    const original = document.title;
+    if (discreet) {
+      document.title = t.comfort.discreetTitleValue;
+    }
+    return () => {
+      document.title = original;
+    };
+  }, [discreet, locale, ready, t.comfort.discreetTitleValue]);
+
+  // Panic clear: Cmd/Ctrl + Shift + L drops every piece of local data after
+  // a single confirm. Designed for the "someone just walked into the room"
+  // scenario where the regular Delete menu takes too many clicks.
+  useEffect(() => {
+    if (!ready) return;
+    function handler(event: KeyboardEvent) {
+      if (!(event.ctrlKey || event.metaKey) || !event.shiftKey) return;
+      if (event.key.toLowerCase() !== "l") return;
+      event.preventDefault();
+      if (window.confirm(t.comfort.panicClearConfirm)) {
+        clearEverything();
+      }
+    }
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [ready, t.comfort.panicClearConfirm]);
+
   function updateGentle(value: boolean) {
     setGentle(value);
     if (typeof window !== "undefined") {
       localStorage.setItem(GENTLE_KEY, value ? "true" : "false");
+    }
+  }
+
+  function updateDiscreet(value: boolean) {
+    setDiscreet(value);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(DISCREET_KEY, value ? "true" : "false");
     }
   }
 
@@ -1321,7 +1373,9 @@ export default function CyclePlanner() {
     localStorage.removeItem(PANEL_TAB_KEY);
     localStorage.removeItem(ONBOARDING_KEY);
     localStorage.removeItem(GENTLE_KEY);
+    localStorage.removeItem(DISCREET_KEY);
     setGentle(true);
+    setDiscreet(false);
     const reset = defaultAppState(detectLocale());
     setApp(reset);
     setCycleForm(EMPTY_CYCLE_FORM);
@@ -1349,7 +1403,9 @@ export default function CyclePlanner() {
         pixelRatio: 2,
       });
       const link = document.createElement("a");
-      link.download = `kalendarzyk-${today}.png`;
+      // Neutral filename — does not advertise the app to anyone watching
+      // the Downloads folder, cloud-sync history, or screenshot tools.
+      link.download = `calendar-${today}.png`;
       link.href = dataUrl;
       link.click();
       setShowExport(false);
@@ -1368,20 +1424,20 @@ export default function CyclePlanner() {
     if (forecast) {
       for (const prediction of forecast.predictions) {
         events.push({
-          uid: `period-${prediction.periodStart}@kalendarzyk`,
+          uid: `period-${prediction.periodStart}@local.invalid`,
           summary: t.period,
           startDate: prediction.periodStart,
           endDate: prediction.periodEnd,
         });
         if (prediction.observed) continue;
         events.push({
-          uid: `fertile-${prediction.fertileStart}@kalendarzyk`,
+          uid: `fertile-${prediction.fertileStart}@local.invalid`,
           summary: t.fertile,
           startDate: prediction.fertileStart,
           endDate: prediction.fertileEnd,
         });
         events.push({
-          uid: `ovulation-${prediction.ovulation}@kalendarzyk`,
+          uid: `ovulation-${prediction.ovulation}@local.invalid`,
           summary: t.ovulation,
           startDate: prediction.ovulation,
           endDate: prediction.ovulation,
@@ -1390,7 +1446,7 @@ export default function CyclePlanner() {
     }
     for (const trip of app.trips.filter((item) => isTripVisible(item, calendarWindow))) {
       events.push({
-        uid: `trip-${trip.id}@kalendarzyk`,
+        uid: `trip-${trip.id}@local.invalid`,
         summary: `${t.trips}: ${trip.name}`,
         startDate: trip.startDate,
         endDate: trip.endDate,
@@ -1399,7 +1455,7 @@ export default function CyclePlanner() {
     if (app.visibleLayers.holidays) {
       for (const holiday of holidayEvents) {
         events.push({
-          uid: `${holiday.id}@kalendarzyk`,
+          uid: `${holiday.id}@local.invalid`,
           summary: `${t.holidays}: ${holiday.name}`,
           startDate: holiday.date,
           endDate: holiday.date,
@@ -1409,7 +1465,7 @@ export default function CyclePlanner() {
     const ics = generateIcsCalendar(events);
     const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
     const link = document.createElement("a");
-    link.download = `kalendarzyk-${today}.ics`;
+    link.download = `calendar-${today}.ics`;
     link.href = URL.createObjectURL(blob);
     link.click();
     URL.revokeObjectURL(link.href);
@@ -1547,6 +1603,24 @@ export default function CyclePlanner() {
           >
             {t.onboarding.resetTitle}
           </button>
+        </section>
+
+        <section className="privacy-mode">
+          <h3>{t.comfort.privacyTitle}</h3>
+          <label className="gentle-switch privacy-row">
+            <input
+              type="checkbox"
+              checked={discreet}
+              onChange={(event) => updateDiscreet(event.target.checked)}
+              aria-label={t.comfort.discreetTitleLabel}
+            />
+            <span className="privacy-row-label">{t.comfort.discreetTitleLabel}</span>
+          </label>
+          <p className="privacy-hint">{t.comfort.discreetTitleHint}</p>
+          <p className="privacy-hint">
+            <strong>{t.comfort.panicClearTitle}.</strong>{" "}
+            {t.comfort.panicClearHint}
+          </p>
         </section>
 
       </aside>

@@ -86,9 +86,21 @@ This release expands Cycle Compass / Kalendarzyk from a simple cycle calendar in
 - PNG export captures the simplified calendar view without sidebar controls.
 - `.ics` export respects the current visible range and enabled marker layers.
 
+### Security
+
+- Added strict response headers via `next.config.ts` — Content-Security-Policy (default-src self, no third-party scripts/connect/fonts/frames), X-Content-Type-Options, X-Frame-Options DENY, Referrer-Policy no-referrer, Permissions-Policy disabling geolocation/camera/mic/USB/FLoC/Topics and other unused browser features, plus Strict-Transport-Security with preload.
+- Hardened ICS export against calendar-injection: trip names and other text fields are now escaped per RFC 5545 §3.3.11 (`\\`, `;`, `,`, newlines), long lines are folded at 75 characters per RFC 5545 §3.1, and the PRODID + UID domain were neutralised so the exported file does not brand itself to whoever imports it.
+- Storage migration now caps `trips` and `periodEntries` at 1000 each and validates `holidayCountry` against an ISO 3166-1 alpha-2 regex, so a tampered or runaway `localStorage` entry cannot freeze the app on hydration or pass unexpected values to the holidays library.
+- Trip name input is now bounded to 200 characters (validation + `isTrip` migration guard).
+- `persistState` swallows quota / disabled-storage errors instead of crashing the React tree (relevant in Safari private mode and policy-restricted browsers).
+- driver.js renders popover text via `innerHTML`; all tour copy must come from static i18n constants. Added `assertStaticTourText` that throws when raw HTML tags appear in the tour copy, plus a SECURITY comment documenting the invariant for future contributors.
+- PNG and ICS exports now use the neutral filename `calendar-${date}.{png,ics}` so the Downloads folder, cloud-sync history and screenshot tools do not advertise the app.
+
 ### Privacy And Safety
 
 - All cycle data, trips, preferences, holiday country settings, and UI choices remain in the current browser via `localStorage`.
+- Added an optional "discreet tab title" — when enabled, the browser tab is named only "Calendar" / "Kalendarz" so the app name is not visible next to other tabs or in screen-shared windows.
+- Added a panic-clear keyboard shortcut: Ctrl/Cmd + Shift + L deletes every piece of local data after a single confirm, designed for the "someone just walked into the room" scenario.
 - The intro copy now explicitly states that data is not sent to third parties and is not processed by AI/LLM models.
 - Safety copy remains visible: cycle, ovulation, and fertility dates are estimates and are not contraception or medical advice.
 

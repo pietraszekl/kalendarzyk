@@ -150,6 +150,7 @@ export const copy = {
       periodLongerThanCycle:
         "Długość krwawienia nie może przekraczać długości cyklu.",
       tripNameRequired: "Podaj nazwę wyjazdu.",
+      tripNameTooLong: "Nazwa wyjazdu może mieć maksymalnie 200 znaków.",
       tripStartRequired: "Podaj datę rozpoczęcia wyjazdu.",
       tripEndRequired: "Podaj datę zakończenia wyjazdu.",
       tripStartPast: "Planowany wyjazd nie może rozpoczynać się w przeszłości.",
@@ -167,6 +168,16 @@ export const copy = {
         "Zmiana wpływa od razu na karty wyjazdów (gradient energii i sugerowaną aktywność).",
       gentleOn: "Włączony",
       gentleOff: "Wyłączony",
+      privacyTitle: "Prywatność",
+      discreetTitleLabel: "Dyskretny tytuł karty",
+      discreetTitleHint:
+        "Zamienia tytuł zakładki przeglądarki na neutralny „Kalendarz”, więc nazwa aplikacji nie jest widoczna obok innych zakładek.",
+      discreetTitleValue: "Kalendarz",
+      panicClearTitle: "Szybkie wyczyszczenie",
+      panicClearHint:
+        "Wciśnij Ctrl + Shift + L (Cmd + Shift + L na Macu), aby usunąć wszystkie dane jednym ruchem.",
+      panicClearConfirm:
+        "Usunąć wszystkie dane (cykl, wyjazdy, ustawienia)? Tej operacji nie da się cofnąć.",
       suggestedActivity: "Sugerowana aktywność",
       dayCount: "{count} dni",
       vibes: {
@@ -369,6 +380,7 @@ export const copy = {
       periodLongerThanCycle:
         "Bleeding length cannot be longer than the cycle length.",
       tripNameRequired: "Enter a trip name.",
+      tripNameTooLong: "A trip name can be at most 200 characters.",
       tripStartRequired: "Enter the trip start date.",
       tripEndRequired: "Enter the trip end date.",
       tripStartPast: "A planned trip cannot start in the past.",
@@ -386,6 +398,16 @@ export const copy = {
         "The change immediately updates trip cards (energy gradient and suggested activity).",
       gentleOn: "On",
       gentleOff: "Off",
+      privacyTitle: "Privacy",
+      discreetTitleLabel: "Discreet browser tab title",
+      discreetTitleHint:
+        "Swap the browser tab title to a neutral 'Calendar' so the app name is not visible next to other tabs.",
+      discreetTitleValue: "Calendar",
+      panicClearTitle: "Quick wipe",
+      panicClearHint:
+        "Press Ctrl + Shift + L (Cmd + Shift + L on Mac) to delete all data in one move.",
+      panicClearConfirm:
+        "Delete all data (cycle, trips, settings)? This cannot be undone.",
       suggestedActivity: "Suggested activity",
       dayCount: "{count} days",
       vibes: {

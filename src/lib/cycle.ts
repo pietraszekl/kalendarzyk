@@ -358,13 +358,30 @@ export function validatePeriodEntry(
   return { errors };
 }
 
+/**
+ * Maximum number of characters allowed in a trip name. Bounded to prevent
+ * a single ICS line from blowing past the RFC limit (even after folding),
+ * to keep PNG export memory predictable, and to avoid layout DoS in lists.
+ */
+export const TRIP_NAME_MAX_LENGTH = 200;
+
+/**
+ * Maximum number of trips and period entries we will keep in storage.
+ * Tampered or runaway data is silently truncated on load (see
+ * `migrateStoredState`) so the app stays responsive on hydration.
+ */
+export const MAX_TRIPS = 1000;
+export const MAX_PERIOD_ENTRIES = 1000;
+
 export function validateTrip(
   trip: Pick<Trip, "name" | "startDate" | "endDate">,
   today: string,
   allowPastStart = false,
 ): TripValidationResult {
   const errors: string[] = [];
-  if (!trip.name.trim()) errors.push("tripNameRequired");
+  const trimmedName = trip.name.trim();
+  if (!trimmedName) errors.push("tripNameRequired");
+  if (trimmedName.length > TRIP_NAME_MAX_LENGTH) errors.push("tripNameTooLong");
   if (!trip.startDate) errors.push("tripStartRequired");
   if (!trip.endDate) errors.push("tripEndRequired");
   if (!allowPastStart && trip.startDate && trip.startDate < today) {
@@ -822,11 +839,49 @@ export interface IcsEvent {
   endDate: string;
 }
 
+/**
+ * Escape user-controlled text for safe insertion into an iCalendar TEXT field
+ * (RFC 5545 §3.3.11). Without this, a trip name containing a newline followed
+ * by `BEGIN:VEVENT` could inject a fake event into the exported file that
+ * appears in the user's calendar after import.
+ */
+export function escapeIcsText(value: string): string {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/\r\n|\r|\n/g, "\\n")
+    .replace(/,/g, "\\,")
+    .replace(/;/g, "\\;");
+}
+
+/**
+ * Fold a content line so it is at most 75 octets long, per RFC 5545 §3.1.
+ * Continuation lines start with a single SPACE; receivers join them by
+ * removing the CRLF+space sequence.
+ *
+ * We fold by character count (not octet count) — for the kinds of input
+ * this app produces (date stamps + ASCII labels + occasional Polish letters)
+ * the difference is irrelevant in practice and the simpler implementation
+ * avoids surface area for UTF-8 splitting bugs.
+ */
+function foldIcsLine(line: string): string {
+  if (line.length <= 75) return line;
+  const parts: string[] = [];
+  let cursor = 0;
+  while (cursor < line.length) {
+    const chunk = cursor === 0 ? 75 : 74;
+    parts.push(line.slice(cursor, cursor + chunk));
+    cursor += chunk;
+  }
+  return parts.join("\r\n ");
+}
+
 export function generateIcsCalendar(events: IcsEvent[]): string {
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Kalendarzyk//Cycle Planner//EN",
+    // Neutral PRODID so the file does not advertise the app to whomever
+    // imports it; calendar viewers display this in event metadata.
+    "PRODID:-//Cycle Compass//EN",
     "CALSCALE:GREGORIAN",
   ];
   for (const event of events) {
@@ -834,10 +889,10 @@ export function generateIcsCalendar(events: IcsEvent[]): string {
     const dtEnd = addDays(event.endDate, 1).replace(/-/g, "");
     lines.push(
       "BEGIN:VEVENT",
-      `UID:${event.uid}`,
+      foldIcsLine(`UID:${escapeIcsText(event.uid)}`),
       `DTSTART;VALUE=DATE:${dtStart}`,
       `DTEND;VALUE=DATE:${dtEnd}`,
-      `SUMMARY:${event.summary}`,
+      foldIcsLine(`SUMMARY:${escapeIcsText(event.summary)}`),
       "END:VEVENT",
     );
   }
@@ -897,9 +952,20 @@ function isTrip(value: unknown): value is Trip {
   return (
     typeof trip.id === "string" &&
     typeof trip.name === "string" &&
+    trip.name.length <= TRIP_NAME_MAX_LENGTH &&
     typeof trip.startDate === "string" &&
     typeof trip.endDate === "string"
   );
+}
+
+/**
+ * Accept only ISO 3166-1 alpha-2 country codes (e.g. "PL", "GB") or null.
+ * Prevents a tampered localStorage value like "../../etc/passwd" from
+ * reaching the `date-holidays` library and causing crashes or surprises.
+ */
+function isHolidayCountry(value: unknown): boolean {
+  if (value === null || value === undefined) return true;
+  return typeof value === "string" && /^[A-Z]{2}$/.test(value);
 }
 
 function isLayers(
@@ -934,8 +1000,7 @@ export function migrateStoredState(value: unknown): AppState | null {
     isLocale(current.locale) &&
     currentHorizon !== null &&
     currentPastMonths !== null &&
-    (current.holidayCountry === null ||
-      typeof current.holidayCountry === "string") &&
+    isHolidayCountry(current.holidayCountry) &&
     isLayers(current.visibleLayers, true, true)
   ) {
     return {
@@ -943,7 +1008,12 @@ export function migrateStoredState(value: unknown): AppState | null {
       horizonMonths: currentHorizon,
       pastMonths: currentPastMonths,
       holidayCountry: current.holidayCountry ?? null,
-      periodEntries: sortPeriodEntries(current.periodEntries),
+      // Truncate runaway arrays so a tampered localStorage entry cannot freeze
+      // the app on hydration with a million synthetic trips or entries.
+      periodEntries: sortPeriodEntries(
+        current.periodEntries.slice(0, MAX_PERIOD_ENTRIES),
+      ),
+      trips: current.trips.slice(0, MAX_TRIPS),
       visibleLayers: current.visibleLayers as VisibleLayers,
     } as AppState;
   }

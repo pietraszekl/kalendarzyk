@@ -89,6 +89,31 @@ function waitForSelector(selector: string, timeoutMs = 1200): Promise<void> {
   });
 }
 
+/**
+ * SECURITY — driver.js v1 renders popover title and description via
+ * `element.innerHTML`, so any HTML in the string will be parsed.
+ *
+ * All tour copy MUST come from `copy[locale].onboarding` (a static i18n
+ * constant). Do NOT interpolate user-controlled values (trip names,
+ * period dates, anything from `localStorage` or the UI) into these strings —
+ * doing so introduces an XSS that exfiltrates the whole `localStorage`
+ * (which includes the cycle history).
+ *
+ * The guard below makes that contract explicit at runtime by failing fast
+ * if a non-static string sneaks in via mutation in dev. It is a thin
+ * helper, not a sanitiser — the goal is to keep the call sites obvious.
+ */
+function assertStaticTourText(value: string): string {
+  if (/[<>]/.test(value)) {
+    // Catches the most obvious mistake — an actual HTML tag in the copy.
+    // We do NOT silently sanitise: a stripped tag would hide the bug while
+    // still being insecure if attackers found a bypass. Throw instead so
+    // the bad copy never ships.
+    throw new Error("Onboarding text must not contain raw HTML tags.");
+  }
+  return value;
+}
+
 export function startOnboarding(ctx: OnboardingContext): void {
   const { t, isMobile, openDrawer, closeDrawer, selectPanelTab, onComplete } =
     ctx;
@@ -133,20 +158,25 @@ export function startOnboarding(ctx: OnboardingContext): void {
     }
   };
 
+  // Wrapper that fails fast if any of the tour copy contains raw HTML — a
+  // belt-and-braces guard against the driver.js innerHTML sink (see comment
+  // on assertStaticTourText above).
+  const safe = assertStaticTourText;
+
   const steps: DriveStep[] = [
     // 1. Welcome — centered, no element
     {
       popover: {
-        title: o.welcomeTitle,
-        description: o.welcomeText,
+        title: safe(o.welcomeTitle),
+        description: safe(o.welcomeText),
       },
     },
     // 2. Manage button / desktop sidebar
     {
       element: isMobile ? ".mobile-manage-button" : ".desktop-sidebar",
       popover: {
-        title: o.manageTitle,
-        description: isMobile ? o.manageText : o.manageTextDesktop,
+        title: safe(o.manageTitle),
+        description: safe(isMobile ? o.manageText : o.manageTextDesktop),
         side: isMobile ? "bottom" : "right",
         align: "start",
       },
@@ -160,8 +190,8 @@ export function startOnboarding(ctx: OnboardingContext): void {
     {
       element: tabSelector(prefix, "cycle"),
       popover: {
-        title: o.cycleTabTitle,
-        description: o.cycleTabText,
+        title: safe(o.cycleTabTitle),
+        description: safe(o.cycleTabText),
         side: isMobile ? "bottom" : "right",
       },
       onHighlightStarted: () => {
@@ -172,8 +202,8 @@ export function startOnboarding(ctx: OnboardingContext): void {
     {
       element: ".two-inputs.number-inputs label:nth-child(1) .number-field",
       popover: {
-        title: o.cycleLengthTitle,
-        description: o.cycleLengthText,
+        title: safe(o.cycleLengthTitle),
+        description: safe(o.cycleLengthText),
         side: isMobile ? "bottom" : "right",
       },
       onHighlightStarted: () => {
@@ -184,8 +214,8 @@ export function startOnboarding(ctx: OnboardingContext): void {
     {
       element: ".two-inputs.number-inputs label:nth-child(2) .number-field",
       popover: {
-        title: o.periodLengthTitle,
-        description: o.periodLengthText,
+        title: safe(o.periodLengthTitle),
+        description: safe(o.periodLengthText),
         side: isMobile ? "bottom" : "right",
       },
     },
@@ -193,8 +223,8 @@ export function startOnboarding(ctx: OnboardingContext): void {
     {
       element: '.period-form input[type="date"]',
       popover: {
-        title: o.firstDayTitle,
-        description: o.firstDayText,
+        title: safe(o.firstDayTitle),
+        description: safe(o.firstDayText),
         side: isMobile ? "top" : "right",
       },
     },
@@ -202,8 +232,8 @@ export function startOnboarding(ctx: OnboardingContext): void {
     {
       element: tabSelector(prefix, "trips"),
       popover: {
-        title: o.tripsTitle,
-        description: o.tripsText,
+        title: safe(o.tripsTitle),
+        description: safe(o.tripsText),
         side: isMobile ? "bottom" : "right",
       },
       onHighlightStarted: () => {
@@ -213,8 +243,8 @@ export function startOnboarding(ctx: OnboardingContext): void {
     // 8. Done (centered)
     {
       popover: {
-        title: o.doneTitle,
-        description: o.doneText,
+        title: safe(o.doneTitle),
+        description: safe(o.doneText),
       },
     },
   ];
