@@ -25,6 +25,22 @@ This release expands Cycle Compass / Kalendarzyk from a simple cycle calendar in
 
 - When no cycle data has been entered, the Summary tab now shows a prominent prompt at the top directing the user to add cycle details, with a direct link to the Cycle tab.
 
+### Comfort-Aware Trip Planning
+
+- Added a collapsible `Comfort plan` to each trip card when cycle data is available. The plan shows the trip's dominant character (rest, discovery, social, cozy), per-day energy on a 5-dot scale, grouped activity suggestions for consecutive days, and an accommodation needs checklist.
+- Added `Gentle mode` (on by default, can be turned off in the Cycle tab) that dims suggested intensity during the luteal phase and the first menstrual days and adds rest-oriented hints such as a buffer day and a quiet, dark room.
+- Comfort suggestions are presented as heuristics with a visible disclaimer that they are not medical advice.
+- Replaced the calendar day-cell comfort dots with a single battery icon (lucide `Battery` / `BatteryLow` / `BatteryMedium` / `BatteryFull`) whose fill variant and stroke colour both reflect the energy level — very low / low / medium → empty/low/medium battery in red/terracotta/mustard; high → full battery in sage; peak → full battery in accent teal. On the "today" cell the battery stays white for legibility.
+- In the sidebar Comfort plan, the day-by-day energy is now a single flat gradient strip with weekday letters and day numbers under each segment, replacing the earlier varying-height bar chart.
+- Reworked the trip card layout into four stacked sections — header (trip name + date row with inline overlap icons), vibe ("Suggested activity" eyebrow above a prominent vibe headline), the gradient energy strip with day labels (visual hero), and a quiet confidence footer ("Confidence" + signal bars on one line). No grid mismatch, no nested boxes, no dividers.
+- The edit/delete actions in the trip card are now absolutely positioned in the top-right corner, so the gradient energy strip and every other section inside the card take the full available width.
+- Bumped typography for readability: trip name 1.05rem, vibe value 1.05rem, eyebrow labels (Suggested activity / Confidence) and date 0.82–0.85rem, day numbers 0.82rem, weekday letters 0.7rem.
+- Sentence-case throughout — eyebrows and values inside the trip card use natural casing and a 0.7–1.0 rem type scale: trip name 1.0rem bold, vibe headline 0.95rem bold accent, date 0.78rem muted, eyebrow labels 0.7rem muted, day numbers 0.76rem foreground, weekday letters 0.62rem muted.
+- Refined the trip card chrome: softer sage-tinted background, hairline teal border, fully-rounded pill gradient strip, and consistent 16px section rhythm.
+- Replaced the textual trip-readiness lines with a single graphic indicator: forecast confidence as a 3-step signal-strength bar (low / medium / high mapped to red / amber / accent). The textual preparation hints were removed.
+- Removed the prescriptive "day-by-day ideas" section — the Comfort plan no longer instructs how to spend each day.
+- All comfort copy is available in Polish and English.
+
 ### CSS Fixes
 
 - Fixed vertical alignment of number-input labels in the Cycle tab so they stay aligned when label text wraps to two lines (common in Polish).
@@ -72,4 +88,5 @@ This release expands Cycle Compass / Kalendarzyk from a simple cycle calendar in
 - Added domain and component coverage for period-history migration, holiday generation, trip readiness, marker visibility, exports, and forecast chips.
 - Added `driver.js` as a dependency for the onboarding tour (~5 KB, zero transitive dependencies).
 - Onboarding logic is isolated in `src/lib/onboarding.ts` with a structural `OnboardingCopy` interface to keep PL/EN i18n type-safe.
+- Comfort-aware planning lives in `src/lib/cycle-comfort.ts` as pure functions over the existing forecast output. Gentle-mode preference is stored under `kalendarzyk.gentle.v1` and cleared by the `Delete everything` action.
 - The app remains deployable on Vercel without environment variables, secrets, backend services, or live holiday APIs.

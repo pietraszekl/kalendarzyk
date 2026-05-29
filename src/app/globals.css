@@ -445,40 +445,121 @@ button:disabled {
   padding: 0;
 }
 
+/* Shared chrome for both planned/past trip items and period entries. */
 .trip-item,
 .period-item {
-  align-items: start;
-  background: #f7f9fc;
-  border: 1px solid #dbe4ef;
-  border-radius: 10px;
+  background: #fafbf8;
+  border: 1px solid rgb(36 88 79 / 10%);
+  border-radius: 14px;
+  box-shadow: 0 1px 0 rgb(36 88 79 / 3%);
+  padding: 16px;
+}
+
+/* Period entries keep the original two-column flex layout
+   (details on the left, edit/delete actions on the right). */
+.period-item {
+  align-items: flex-start;
+  background: #fff7f8;
+  border-color: #efd5dc;
   display: flex;
   gap: 8px;
   justify-content: space-between;
-  padding: 10px;
 }
 
-.period-item {
-  background: #fff7f8;
-  border-color: #efd5dc;
+/* Trip cards: trip-actions are absolutely positioned in the top-right
+   so the gradient strip and other sections inside .trip-details get the
+   full card width. Header reserves space for the actions on its right. */
+.trip-item {
+  position: relative;
 }
 
+.trip-item > .trip-actions {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+}
+
+.trip-item .trip-header {
+  padding-right: 60px;
+}
+
+/* Trip card is a single flat block with clear vertical rhythm.
+   Sections (header / vibe / strip / confidence) are siblings inside
+   .trip-details, separated by a uniform gap — no nested boxes or dividers. */
 .trip-details {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
-  gap: 4px;
+  gap: 16px;
   min-width: 0;
 }
 
-.trip-details strong {
-  font-size: 0.82rem;
+.trip-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.trip-name {
+  color: var(--foreground);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.trip-details > span:not(.overlap-icons) {
+.trip-date-row {
+  align-items: center;
   color: var(--muted);
-  font-size: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.trip-date {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+/* Small label-style eyebrow — used above the vibe value and inline
+   next to the confidence bars. Bumped for readability. */
+.trip-eyebrow {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+/* The vibe is the trip's "headline" — biggest non-title text in the card. */
+.trip-vibe {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trip-vibe-value {
+  color: var(--accent);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  margin: 0;
+}
+
+/* The gradient strip is the visual hero — a wide rounded pill spanning
+   the full available card width. */
+.trip-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* The confidence row is a quiet footer — label + bars on one line. */
+.trip-confidence {
+  align-items: center;
+  display: flex;
+  gap: 8px;
 }
 
 .outside-view {
@@ -510,22 +591,40 @@ button:disabled {
   color: var(--holidays);
 }
 
-.readiness-card {
-  background: rgb(255 255 255 / 68%);
-  border: 1px solid rgb(222 215 208 / 75%);
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 6px;
-  padding: 8px;
+
+.confidence-bars {
+  align-items: flex-end;
+  display: inline-flex;
+  gap: 2px;
+  height: 12px;
 }
 
-.readiness-card small {
-  color: var(--muted);
-  font-size: 0.69rem;
-  line-height: 1.35;
+.confidence-bars .bar {
+  background: rgb(36 88 79 / 16%);
+  border-radius: 1.5px;
+  display: inline-block;
+  width: 3px;
 }
+
+.confidence-bars .bar:nth-child(1) { height: 40%; }
+.confidence-bars .bar:nth-child(2) { height: 70%; }
+.confidence-bars .bar:nth-child(3) { height: 100%; }
+
+.confidence-bars.confidence-low .bar:nth-child(1) {
+  background: #c97a7a;
+}
+
+.confidence-bars.confidence-medium .bar:nth-child(1),
+.confidence-bars.confidence-medium .bar:nth-child(2) {
+  background: #d8a374;
+}
+
+.confidence-bars.confidence-high .bar:nth-child(1),
+.confidence-bars.confidence-high .bar:nth-child(2),
+.confidence-bars.confidence-high .bar:nth-child(3) {
+  background: var(--accent);
+}
+
 
 .trip-actions {
   display: flex;
@@ -1921,4 +2020,123 @@ legend {
   .driver-popover-description {
     font-size: 0.88rem;
   }
+}
+
+/* Gentle mode toggle in Cycle tab */
+.gentle-mode {
+  background: rgb(255 255 255 / 55%);
+  border: 1px solid rgb(222 215 208 / 75%);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 12px 14px;
+}
+
+.gentle-mode-header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.gentle-mode-header h3 {
+  color: var(--accent);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.gentle-mode > p {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.gentle-switch {
+  align-items: center;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.8rem;
+  gap: 8px;
+  user-select: none;
+}
+
+.gentle-switch input {
+  accent-color: var(--accent);
+  height: 16px;
+  margin: 0;
+  width: 16px;
+}
+
+.gentle-switch span {
+  color: var(--muted);
+}
+
+.gentle-switch input:checked + span {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Comfort plan card inside trip items */
+
+/* Day-by-day energy gradient strip — the visual hero of the trip card.
+   A fully-rounded pill so the colour transitions feel soft. */
+.energy-strip {
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgb(36 88 79 / 6%);
+  height: 16px;
+  width: 100%;
+}
+
+.energy-strip-labels {
+  display: grid;
+  gap: 0;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+}
+
+.energy-label {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.energy-weekday {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.energy-daynum {
+  color: var(--foreground);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+
+/* Per-day comfort indicator: a battery icon whose fill (icon variant) and
+   colour reflect the energy level. Shown only on days that overlap a trip
+   when cycle data is available. Anchored at the top-left of the cell. */
+.day-comfort {
+  align-items: center;
+  display: inline-flex;
+  left: 6px;
+  pointer-events: none;
+  position: absolute;
+  top: 6px;
+}
+
+.day-comfort.energy-1 { color: #c97a7a; }
+.day-comfort.energy-2 { color: #d8a374; }
+.day-comfort.energy-3 { color: #c9b06f; }
+.day-comfort.energy-4 { color: #6fa68b; }
+.day-comfort.energy-5 { color: var(--accent); }
+
+/* On the highlighted "today" cell (dark accent background) the battery
+   icon needs a light colour to stay legible. */
+.day-today .day-comfort {
+  color: #fff;
 }

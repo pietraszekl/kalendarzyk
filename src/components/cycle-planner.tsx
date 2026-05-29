@@ -2,6 +2,10 @@
 
 import { toPng } from "html-to-image";
 import {
+  Battery,
+  BatteryFull,
+  BatteryLow,
+  BatteryMedium,
   CalendarDays,
   CalendarPlus,
   ChevronDown,
@@ -34,6 +38,7 @@ import {
   CycleLayer,
   CyclePrediction,
   Forecast,
+  ForecastConfidence,
   HolidayEvent,
   HorizonMonths,
   Layer,
@@ -67,6 +72,11 @@ import {
   validatePeriodEntry,
   validateTrip,
 } from "@/lib/cycle";
+import {
+  buildComfortPlan,
+  buildEnergyGradient,
+  dailyEnergy,
+} from "@/lib/cycle-comfort";
 import { holidayCountries, holidayEventsForWindow } from "@/lib/holidays";
 import { copy, dateLocale, layerName } from "@/lib/i18n";
 import {
@@ -82,6 +92,7 @@ const LEGACY_V2_STORAGE_KEY = "kalendarzyk.settings.v2";
 const LEGACY_STORAGE_KEY = "kalendarzyk.settings.v1";
 const LOCALE_KEY = "kalendarzyk.locale";
 const PANEL_TAB_KEY = "kalendarzyk.panelTab";
+const GENTLE_KEY = "kalendarzyk.gentle.v1";
 const MOBILE_QUERY = "(max-width: 820px)";
 
 type PanelTab = "summary" | "trips" | "cycle";
@@ -313,6 +324,14 @@ function formatDate(
   ).format(parseDateKey(value));
 }
 
+function formatWeekdayNarrow(value: string, locale: Locale): string {
+  return new Intl.DateTimeFormat(dateLocale(locale), {
+    weekday: "narrow",
+  })
+    .format(parseDateKey(value))
+    .toUpperCase();
+}
+
 function formatRange(start: string, end: string, locale: Locale) {
   if (start === end) return formatDate(start, locale);
   return `${formatDate(start, locale, { day: "numeric", month: "short" })} - ${formatDate(end, locale, {
@@ -351,6 +370,26 @@ function LayerIcon({ layer, size = 15 }: { layer: Layer; size?: number }) {
   return <Plane size={size} />;
 }
 
+function EnergyBattery({ level }: { level: 1 | 2 | 3 | 4 | 5 }) {
+  const size = 15;
+  const strokeWidth = 1.8;
+  if (level === 1) return <Battery size={size} strokeWidth={strokeWidth} aria-hidden="true" />;
+  if (level === 2) return <BatteryLow size={size} strokeWidth={strokeWidth} aria-hidden="true" />;
+  if (level === 3) return <BatteryMedium size={size} strokeWidth={strokeWidth} aria-hidden="true" />;
+  // Levels 4 and 5 both use the full icon; colour distinguishes them via CSS.
+  return <BatteryFull size={size} strokeWidth={strokeWidth} aria-hidden="true" />;
+}
+
+function ConfidenceBars({ level }: { level: ForecastConfidence }) {
+  return (
+    <span className={`confidence-bars confidence-${level}`} aria-hidden="true">
+      <span className="bar" />
+      <span className="bar" />
+      <span className="bar" />
+    </span>
+  );
+}
+
 function CalendarMonth({
   month,
   predictions,
@@ -362,6 +401,8 @@ function CalendarMonth({
   isMobile,
   selectedDate,
   onSelectDate,
+  cycleLength,
+  gentle,
 }: {
   month: string;
   predictions: CyclePrediction[];
@@ -373,6 +414,8 @@ function CalendarMonth({
   isMobile: boolean;
   selectedDate: string | null;
   onSelectDate: (date: string) => void;
+  cycleLength: number | null;
+  gentle: boolean;
 }) {
   const t = copy[locale];
   const date = parseDateKey(month);
@@ -510,11 +553,18 @@ function CalendarMonth({
                 const matchingHolidays = layers.holidays
                   ? holidays.filter((holiday) => holiday.date === value)
                   : [];
+                const energy =
+                  matchingTrips.length > 0 && cycleLength
+                    ? dailyEnergy(value, predictions, cycleLength, gentle)
+                    : null;
                 const description = [
                   ...cycleLayers.map((layer) => layerName(locale, layer)),
                   ...matchingTrips.map((trip) => `${t.trips}: ${trip.name}`),
                   ...matchingHolidays.map((holiday) => `${t.holidays}: ${holiday.name}`),
-                ].join(", ");
+                  energy ? `${t.comfort.energyTitle}: ${t.comfort.energyLabels[energy.level]}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(", ");
                 const isToday = value === today;
                 return (
                   <button
@@ -530,6 +580,15 @@ function CalendarMonth({
                     type="button"
                   >
                     <span className="day-number">{parseDateKey(value).getDate()}</span>
+                    {energy && (
+                      <span
+                        className={`day-comfort energy-${energy.level}`}
+                        aria-hidden="true"
+                        title={t.comfort.energyLabels[energy.level]}
+                      >
+                        <EnergyBattery level={energy.level} />
+                      </span>
+                    )}
                     {(layout.hiddenByDate[value]?.length ?? 0) > 0 && (
                       <small className="day-overflow">+{layout.hiddenByDate[value].length}</small>
                     )}
@@ -663,6 +722,9 @@ function TripItem({
   window,
   overlap,
   readiness,
+  predictions,
+  cycleLength,
+  gentle,
   onEdit,
   onRemove,
 }: {
@@ -671,61 +733,106 @@ function TripItem({
   window: CalendarWindow;
   overlap: CycleLayer[];
   readiness: ReturnType<typeof tripReadiness> | null;
+  predictions: CyclePrediction[];
+  cycleLength: number | null;
+  gentle: boolean;
   onEdit: (trip: Trip) => void;
   onRemove: (trip: Trip) => void;
 }) {
   const t = copy[locale];
-  const readinessLines =
-    readiness
-      ? [
-          readiness.observedPeriodOverlap ? t.readinessObservedPeriod : null,
-          readiness.predictedPeriodOverlap ? t.readinessPredictedPeriod : null,
-          readiness.holidayOverlaps.length > 0
-            ? t.readinessHolidays.replace("{count}", String(readiness.holidayOverlaps.length))
-            : null,
-          t.readinessConfidence.replace(
-            "{level}",
-            t.forecastConfidence[readiness.forecastConfidence],
-          ),
-          readiness.preparationHints.length > 0
-            ? `${t.readinessPreparation}: ${readiness.preparationHints.map((hint) => t.preparationHints[hint]).join(", ")}`
-            : null,
-        ].filter(Boolean)
-      : [];
+  const comfortPlan = useMemo(
+    () =>
+      predictions.length > 0 && cycleLength
+        ? buildComfortPlan(trip, predictions, cycleLength, gentle)
+        : null,
+    [trip, predictions, cycleLength, gentle],
+  );
   return (
     <li className="trip-item">
       <div className="trip-details">
-        <strong>{trip.name}</strong>
-        <span>{formatRange(trip.startDate, trip.endDate, locale)}</span>
-        {!isTripVisible(trip, window) && (
-          <small className="outside-view">{t.outsideView}</small>
-        )}
-        {overlap.length > 0 && (
-          <span className="overlap-icons" aria-label={t.overlapsWith}>
-            {overlap.map((layer) => (
-              <span className={`overlap-${layer}`} key={layer} title={layerName(locale, layer)}>
-                <LayerIcon layer={layer} size={14} />
-                <span className="sr-only">{layerName(locale, layer)}</span>
+        <header className="trip-header">
+          <strong className="trip-name">{trip.name}</strong>
+          <div className="trip-date-row">
+            <span className="trip-date">{formatRange(trip.startDate, trip.endDate, locale)}</span>
+            {overlap.length > 0 && (
+              <span className="overlap-icons" aria-label={t.overlapsWith}>
+                {overlap.map((layer) => (
+                  <span className={`overlap-${layer}`} key={layer} title={layerName(locale, layer)}>
+                    <LayerIcon layer={layer} size={13} />
+                    <span className="sr-only">{layerName(locale, layer)}</span>
+                  </span>
+                ))}
               </span>
-            ))}
-          </span>
-        )}
-        {readiness && readiness.holidayOverlaps.length > 0 && (
-          <span className="overlap-icons" aria-label={t.holidayOverlaps}>
-            {readiness.holidayOverlaps.slice(0, 3).map((holiday) => (
-              <span className="overlap-holidays" key={holiday.id} title={holiday.name}>
-                <CalendarDays size={14} />
-                <span className="sr-only">{holiday.name}</span>
+            )}
+            {readiness && readiness.holidayOverlaps.length > 0 && (
+              <span className="overlap-icons" aria-label={t.holidayOverlaps}>
+                {readiness.holidayOverlaps.slice(0, 3).map((holiday) => (
+                  <span className="overlap-holidays" key={holiday.id} title={holiday.name}>
+                    <CalendarDays size={13} />
+                    <span className="sr-only">{holiday.name}</span>
+                  </span>
+                ))}
               </span>
-            ))}
-          </span>
-        )}
-        {readinessLines.length > 0 && (
-          <div className="readiness-card" aria-label={t.tripReadiness}>
-            {readinessLines.map((line) => (
-              <small key={line}>{line}</small>
-            ))}
+            )}
           </div>
+          {!isTripVisible(trip, window) && (
+            <small className="outside-view">{t.outsideView}</small>
+          )}
+        </header>
+
+        {comfortPlan && (
+          <section className="trip-vibe">
+            <span className="trip-eyebrow">{t.comfort.suggestedActivity}</span>
+            <p className="trip-vibe-value">{t.comfort.vibes[comfortPlan.vibe]}</p>
+          </section>
+        )}
+
+        {comfortPlan && (
+          <section className="trip-strip" aria-label={t.comfort.energyAriaStrip}>
+            <div
+              className="energy-strip"
+              role="img"
+              aria-label={t.comfort.energyAriaStrip}
+              style={{
+                background: buildEnergyGradient(
+                  comfortPlan.daily.map((day) => day.level),
+                ),
+              }}
+            />
+            <div className="energy-strip-labels">
+              {comfortPlan.daily.map((day) => (
+                <div
+                  className="energy-label"
+                  key={day.date}
+                  title={`${formatDate(day.date, locale, {
+                    weekday: "short",
+                    day: "numeric",
+                    month: "short",
+                  })} — ${t.comfort.energyLabels[day.level]}`}
+                >
+                  <span className="energy-weekday">
+                    {formatWeekdayNarrow(day.date, locale)}
+                  </span>
+                  <span className="energy-daynum">
+                    {parseDateKey(day.date).getDate()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {readiness && (
+          <footer
+            className="trip-confidence"
+            title={t.readinessConfidence.replace(
+              "{level}",
+              t.forecastConfidence[readiness.forecastConfidence],
+            )}
+          >
+            <span className="trip-eyebrow">{t.readinessConfidenceShort}</span>
+            <ConfidenceBars level={readiness.forecastConfidence} />
+          </footer>
         )}
       </div>
       <div className="trip-actions">
@@ -791,6 +898,7 @@ export default function CyclePlanner() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [panelTab, setPanelTab] = useState<PanelTab>("summary");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [gentle, setGentle] = useState<boolean>(true);
   const reportRef = useRef<HTMLDivElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
   const drawerCloseRef = useRef<HTMLButtonElement>(null);
@@ -836,6 +944,8 @@ export default function CyclePlanner() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setApp(initialState);
     if (isPanelTab(savedPanelTab)) setPanelTab(savedPanelTab);
+    const savedGentle = localStorage.getItem(GENTLE_KEY);
+    if (savedGentle === "false") setGentle(false);
     if (initialState.cycleSettings) {
       setCycleForm({
         cycleLengthDays: String(initialState.cycleSettings.cycleLengthDays),
@@ -858,6 +968,13 @@ export default function CyclePlanner() {
   useEffect(() => {
     if (ready) document.documentElement.lang = locale;
   }, [locale, ready]);
+
+  function updateGentle(value: boolean) {
+    setGentle(value);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(GENTLE_KEY, value ? "true" : "false");
+    }
+  }
 
   useEffect(() => {
     if (!ready) return;
@@ -1164,6 +1281,8 @@ export default function CyclePlanner() {
     localStorage.removeItem(LOCALE_KEY);
     localStorage.removeItem(PANEL_TAB_KEY);
     localStorage.removeItem(ONBOARDING_KEY);
+    localStorage.removeItem(GENTLE_KEY);
+    setGentle(true);
     const reset = defaultAppState(detectLocale());
     setApp(reset);
     setCycleForm(EMPTY_CYCLE_FORM);
@@ -1353,6 +1472,22 @@ export default function CyclePlanner() {
           )}
         </section>
 
+        <section className="gentle-mode">
+          <div className="gentle-mode-header">
+            <h3>{t.comfort.gentleToggleTitle}</h3>
+            <label className="gentle-switch">
+              <input
+                type="checkbox"
+                checked={gentle}
+                onChange={(event) => updateGentle(event.target.checked)}
+                aria-label={t.comfort.gentleToggleTitle}
+              />
+              <span aria-hidden="true">{gentle ? t.comfort.gentleOn : t.comfort.gentleOff}</span>
+            </label>
+          </div>
+          <p>{t.comfort.gentleToggleText}</p>
+        </section>
+
       </aside>
     );
   }
@@ -1414,6 +1549,9 @@ export default function CyclePlanner() {
                   window={calendarWindow}
                   overlap={forecast ? tripOverlapLayers(trip, predictions) : []}
                   readiness={tripReadiness(trip, predictions, holidayEvents, app?.cycleSettings ?? null, sortedPeriodEntries)}
+                  predictions={predictions}
+                  cycleLength={currentCycleLength}
+                  gentle={gentle}
                   onEdit={editTrip}
                   onRemove={removeTrip}
                 />
@@ -1434,6 +1572,9 @@ export default function CyclePlanner() {
                     window={calendarWindow}
                     overlap={forecast ? tripOverlapLayers(trip, predictions) : []}
                     readiness={tripReadiness(trip, predictions, holidayEvents, app?.cycleSettings ?? null, sortedPeriodEntries)}
+                    predictions={predictions}
+                    cycleLength={currentCycleLength}
+                    gentle={gentle}
                     onEdit={editTrip}
                     onRemove={removeTrip}
                   />
@@ -1621,7 +1762,7 @@ export default function CyclePlanner() {
             <div aria-hidden="true" className="capture-header"><h2>{t.calendar}</h2></div>
             <div className="months">
               {calendarWindow.months.map((month) => (
-                <CalendarMonth key={month} month={month} predictions={predictions} trips={app.trips} holidays={holidayEvents} layers={app.visibleLayers} locale={locale} today={today} isMobile={isMobile} selectedDate={selectedDate} onSelectDate={(date) => setSelectedDate((selected) => selected === date ? null : date)} />
+                <CalendarMonth key={month} month={month} predictions={predictions} trips={app.trips} holidays={holidayEvents} layers={app.visibleLayers} locale={locale} today={today} isMobile={isMobile} selectedDate={selectedDate} onSelectDate={(date) => setSelectedDate((selected) => selected === date ? null : date)} cycleLength={currentCycleLength} gentle={gentle} />
               ))}
             </div>
             <Legend locale={locale} layers={app.visibleLayers} hasCycle={hasCycleData} hasHolidays={!!app.holidayCountry} />
