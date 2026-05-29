@@ -455,15 +455,23 @@ button:disabled {
   padding: 16px;
 }
 
-/* Period entries keep the original two-column flex layout
-   (details on the left, edit/delete actions on the right). */
+/* Period entries match the trip card layout — actions absolute top-right,
+   details take full width — for visual consistency between the two lists. */
 .period-item {
-  align-items: flex-start;
   background: #fff7f8;
   border-color: #efd5dc;
-  display: flex;
-  gap: 8px;
-  justify-content: space-between;
+  padding: 14px 16px;
+  position: relative;
+}
+
+.period-item > .trip-actions {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+}
+
+.period-item .trip-details {
+  padding-right: 60px;
 }
 
 /* Trip cards: trip-actions are absolutely positioned in the top-right
@@ -524,10 +532,10 @@ button:disabled {
 }
 
 /* Small label-style eyebrow — used above the vibe value and inline
-   next to the confidence bars. Bumped for readability. */
+   next to the confidence bars. Sized at WCAG-safe minimum body text. */
 .trip-eyebrow {
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: 0.875rem;
   font-weight: 500;
   letter-spacing: 0;
 }
@@ -610,13 +618,16 @@ button:disabled {
 .confidence-bars .bar:nth-child(2) { height: 70%; }
 .confidence-bars .bar:nth-child(3) { height: 100%; }
 
+/* Confidence uses a neutral grayscale ramp deliberately distinct from
+   the warm energy palette, so users do not confuse "low confidence"
+   with "low energy" — they are different kinds of information. */
 .confidence-bars.confidence-low .bar:nth-child(1) {
-  background: #c97a7a;
+  background: rgb(36 88 79 / 55%);
 }
 
 .confidence-bars.confidence-medium .bar:nth-child(1),
 .confidence-bars.confidence-medium .bar:nth-child(2) {
-  background: #d8a374;
+  background: rgb(36 88 79 / 70%);
 }
 
 .confidence-bars.confidence-high .bar:nth-child(1),
@@ -2136,7 +2147,91 @@ legend {
 .day-comfort.energy-5 { color: var(--accent); }
 
 /* On the highlighted "today" cell (dark accent background) the battery
-   icon needs a light colour to stay legible. */
+   icon needs a light colour to stay legible. The drop-shadow also helps
+   when the cell overlaps with cycle/holiday colour bars below it. */
 .day-today .day-comfort {
   color: #fff;
+}
+
+.day-comfort svg {
+  filter: drop-shadow(0 1px 1px rgba(20, 32, 28, 0.18));
+}
+
+/* Smaller battery icon on narrow viewports so it doesn't dominate the cell. */
+@media (max-width: 480px) {
+  .day-comfort svg {
+    height: 13px;
+    width: 13px;
+  }
+}
+
+/* Trip-vibe day count chip — sits inline with the eyebrow label as a quiet
+   secondary stat (e.g. "Suggested activity · 8 days"). */
+.trip-vibe-days {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* Hint shown next to "Outside current view" with a pointer to the
+   horizon-range setting in the Summary panel. */
+.outside-view-hint {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* Sub-note under the gentle-mode toggle explaining its effect on trip cards. */
+.gentle-affect-note {
+  color: var(--muted);
+  display: block;
+  font-size: 0.74rem;
+  margin-top: 4px;
+}
+
+/* Replay-tour card in the Cycle panel. Same visual rhythm as gentle-mode. */
+.reset-onboarding {
+  background: rgb(255 255 255 / 55%);
+  border: 1px solid rgb(222 215 208 / 75%);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 12px 14px;
+}
+
+.reset-onboarding h3 {
+  color: var(--accent);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.reset-onboarding p {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.reset-onboarding button {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+/* Loading shell shown briefly during initial hydration — centered logo with
+   a gentle pulse so the user sees branded continuity instead of a blank flash. */
+.loading-shell {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.loading-shell-inner {
+  animation: loading-pulse 1.4s ease-in-out infinite;
+  opacity: 0.55;
+}
+
+@keyframes loading-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 0.85; }
 }

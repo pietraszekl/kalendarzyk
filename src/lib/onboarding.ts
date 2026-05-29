@@ -15,6 +15,9 @@ export interface OnboardingCopy {
   welcomeText: string;
   manageTitle: string;
   manageText: string;
+  manageTextDesktop: string;
+  resetTitle: string;
+  resetText: string;
   cycleTabTitle: string;
   cycleTabText: string;
   cycleLengthTitle: string;
@@ -113,6 +116,12 @@ export function startOnboarding(ctx: OnboardingContext): void {
       selectPanelTab("cycle");
     }
     await waitForSelector(".two-inputs.number-inputs label:nth-child(1) input");
+    // Scroll the cycle form into view so driver.js highlights an element the
+    // user can actually see (the form sits below section headings).
+    const target = document.querySelector(
+      ".two-inputs.number-inputs",
+    ) as HTMLElement | null;
+    target?.scrollIntoView({ block: "center", behavior: "smooth" });
   };
 
   const ensureTripsTab = async () => {
@@ -137,7 +146,7 @@ export function startOnboarding(ctx: OnboardingContext): void {
       element: isMobile ? ".mobile-manage-button" : ".desktop-sidebar",
       popover: {
         title: o.manageTitle,
-        description: o.manageText,
+        description: isMobile ? o.manageText : o.manageTextDesktop,
         side: isMobile ? "bottom" : "right",
         align: "start",
       },

@@ -15,7 +15,9 @@ Cycle Compass helps users plan trips and, if they choose, overlay estimated peri
 
 - First-time users are guided through an interactive onboarding tour (spotlight overlay with step-by-step popovers) that walks through cycle settings, period entry, and trip planning.
 - Each trip card is organised as four stacked sections — header (trip name + date with inline overlap icons), vibe (small "Suggested activity" eyebrow above a prominent vibe headline), gradient energy strip with weekday/day labels, and a quiet confidence footer with a 3-step signal bar. Sentence case, sage-tinted background, fully-rounded gradient pill.
-- Calendar day cells that overlap a trip show a small battery icon whose fill and colour both reflect the day's energy level, so the daily comfort estimate is visible directly in the calendar grid.
+- Calendar day cells that overlap a trip show a small battery icon whose fill (`Battery` / `BatteryLow` / `BatteryMedium` / `BatteryFull` / `BatteryCharging`) and colour both reflect the day's energy level.
+- Past trips show only their identity (name, dates, overlap icons) — forecast metadata is hidden once a trip has ended.
+- Returning users can replay the onboarding tour from the Cycle tab.
 - Toggle Gentle mode (on by default) to dim suggested intensity during the luteal phase and the first menstrual days and to add rest-oriented hints.
 - Add actual period starts from up to 3 months back and keep a local period history.
 - Forecast future period, ovulation, and fertile-window dates from saved history or fallback cycle settings.

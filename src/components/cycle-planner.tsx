@@ -3,6 +3,7 @@
 import { toPng } from "html-to-image";
 import {
   Battery,
+  BatteryCharging,
   BatteryFull,
   BatteryLow,
   BatteryMedium,
@@ -324,12 +325,13 @@ function formatDate(
   ).format(parseDateKey(value));
 }
 
-function formatWeekdayNarrow(value: string, locale: Locale): string {
-  return new Intl.DateTimeFormat(dateLocale(locale), {
-    weekday: "narrow",
-  })
-    .format(parseDateKey(value))
-    .toUpperCase();
+function formatWeekdayShort(value: string, locale: Locale): string {
+  // Use the curated 2-letter abbreviations from copy[locale].weekdaysShort —
+  // Intl "narrow" produces ambiguous single letters (M T W T F S S in English)
+  // and lowercase letters in Polish, both of which read poorly under the strip.
+  const labels = copy[locale].weekdaysShort;
+  const dayIndex = (parseDateKey(value).getDay() + 6) % 7;
+  return labels[dayIndex];
 }
 
 function formatRange(start: string, end: string, locale: Locale) {
@@ -376,13 +378,25 @@ function EnergyBattery({ level }: { level: 1 | 2 | 3 | 4 | 5 }) {
   if (level === 1) return <Battery size={size} strokeWidth={strokeWidth} aria-hidden="true" />;
   if (level === 2) return <BatteryLow size={size} strokeWidth={strokeWidth} aria-hidden="true" />;
   if (level === 3) return <BatteryMedium size={size} strokeWidth={strokeWidth} aria-hidden="true" />;
-  // Levels 4 and 5 both use the full icon; colour distinguishes them via CSS.
-  return <BatteryFull size={size} strokeWidth={strokeWidth} aria-hidden="true" />;
+  if (level === 4) return <BatteryFull size={size} strokeWidth={strokeWidth} aria-hidden="true" />;
+  // Peak energy: charging icon adds shape variation on top of colour for L5.
+  return <BatteryCharging size={size} strokeWidth={strokeWidth} aria-hidden="true" />;
 }
 
-function ConfidenceBars({ level }: { level: ForecastConfidence }) {
+function ConfidenceBars({
+  level,
+  ariaLabel,
+}: {
+  level: ForecastConfidence;
+  ariaLabel?: string;
+}) {
   return (
-    <span className={`confidence-bars confidence-${level}`} aria-hidden="true">
+    <span
+      className={`confidence-bars confidence-${level}`}
+      role={ariaLabel ? "img" : undefined}
+      aria-label={ariaLabel}
+      aria-hidden={ariaLabel ? undefined : true}
+    >
       <span className="bar" />
       <span className="bar" />
       <span className="bar" />
@@ -725,6 +739,7 @@ function TripItem({
   predictions,
   cycleLength,
   gentle,
+  isPast,
   onEdit,
   onRemove,
 }: {
@@ -736,16 +751,19 @@ function TripItem({
   predictions: CyclePrediction[];
   cycleLength: number | null;
   gentle: boolean;
+  isPast: boolean;
   onEdit: (trip: Trip) => void;
   onRemove: (trip: Trip) => void;
 }) {
   const t = copy[locale];
+  // Past trips: never show forward-looking metadata (vibe / strip / confidence).
+  // It would be misleading to display a forecast for dates that already passed.
   const comfortPlan = useMemo(
     () =>
-      predictions.length > 0 && cycleLength
+      !isPast && predictions.length > 0 && cycleLength
         ? buildComfortPlan(trip, predictions, cycleLength, gentle)
         : null,
-    [trip, predictions, cycleLength, gentle],
+    [trip, predictions, cycleLength, gentle, isPast],
   );
   return (
     <li className="trip-item">
@@ -776,13 +794,24 @@ function TripItem({
             )}
           </div>
           {!isTripVisible(trip, window) && (
-            <small className="outside-view">{t.outsideView}</small>
+            <small className="outside-view">
+              {t.outsideView} <span className="outside-view-hint">— {t.outsideViewHint}</span>
+            </small>
           )}
         </header>
 
         {comfortPlan && (
           <section className="trip-vibe">
-            <span className="trip-eyebrow">{t.comfort.suggestedActivity}</span>
+            <span className="trip-eyebrow">
+              {t.comfort.suggestedActivity}
+              <span aria-hidden="true"> · </span>
+              <span className="trip-vibe-days">
+                {t.comfort.dayCount.replace(
+                  "{count}",
+                  String(comfortPlan.daily.length),
+                )}
+              </span>
+            </span>
             <p className="trip-vibe-value">{t.comfort.vibes[comfortPlan.vibe]}</p>
           </section>
         )}
@@ -811,7 +840,7 @@ function TripItem({
                   })} — ${t.comfort.energyLabels[day.level]}`}
                 >
                   <span className="energy-weekday">
-                    {formatWeekdayNarrow(day.date, locale)}
+                    {formatWeekdayShort(day.date, locale)}
                   </span>
                   <span className="energy-daynum">
                     {parseDateKey(day.date).getDate()}
@@ -822,7 +851,7 @@ function TripItem({
           </section>
         )}
 
-        {readiness && (
+        {!isPast && readiness && (
           <footer
             className="trip-confidence"
             title={t.readinessConfidence.replace(
@@ -831,7 +860,13 @@ function TripItem({
             )}
           >
             <span className="trip-eyebrow">{t.readinessConfidenceShort}</span>
-            <ConfidenceBars level={readiness.forecastConfidence} />
+            <ConfidenceBars
+              level={readiness.forecastConfidence}
+              ariaLabel={t.readinessConfidence.replace(
+                "{level}",
+                t.forecastConfidence[readiness.forecastConfidence],
+              )}
+            />
           </footer>
         )}
       </div>
@@ -976,6 +1011,17 @@ export default function CyclePlanner() {
     }
   }
 
+  function launchOnboarding() {
+    startOnboarding({
+      t,
+      isMobile,
+      openDrawer: (tab) => openDrawer(tab),
+      closeDrawer: () => setDrawerOpen(false),
+      selectPanelTab: (tab) => selectPanelTab(tab),
+      onComplete: markOnboardingComplete,
+    });
+  }
+
   useEffect(() => {
     if (!ready) return;
     if (onboardingStartedRef.current) return;
@@ -986,14 +1032,7 @@ export default function CyclePlanner() {
       return;
     }
     onboardingStartedRef.current = true;
-    startOnboarding({
-      t,
-      isMobile,
-      openDrawer: (tab) => openDrawer(tab),
-      closeDrawer: () => setDrawerOpen(false),
-      selectPanelTab: (tab) => selectPanelTab(tab),
-      onComplete: markOnboardingComplete,
-    });
+    launchOnboarding();
     // Re-running only changes the language of an in-flight tour, which we
     // don't support. The ref above guards against duplicate launches.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1376,7 +1415,16 @@ export default function CyclePlanner() {
     URL.revokeObjectURL(link.href);
   }
 
-  if (!ready || !app) return <main className="loading-shell" aria-label="Kalendarzyk" />;
+  if (!ready || !app) {
+    return (
+      <main className="loading-shell" aria-label="Kalendarzyk" role="status">
+        <div className="loading-shell-inner">
+          <MoonBloomLogo size={56} />
+          <span className="sr-only">Cycle Compass</span>
+        </div>
+      </main>
+    );
+  }
 
   const nextPeriod = forecast?.upcoming[0] ?? null;
   const nextOvulation = forecast ? nextEvent(forecast, today, "ovulation") : null;
@@ -1486,6 +1534,19 @@ export default function CyclePlanner() {
             </label>
           </div>
           <p>{t.comfort.gentleToggleText}</p>
+          <small className="gentle-affect-note">{t.comfort.gentleAffectsTrips}</small>
+        </section>
+
+        <section className="reset-onboarding">
+          <h3>{t.onboarding.resetTitle}</h3>
+          <p>{t.onboarding.resetText}</p>
+          <button
+            className="secondary-button"
+            onClick={() => launchOnboarding()}
+            type="button"
+          >
+            {t.onboarding.resetTitle}
+          </button>
         </section>
 
       </aside>
@@ -1552,6 +1613,7 @@ export default function CyclePlanner() {
                   predictions={predictions}
                   cycleLength={currentCycleLength}
                   gentle={gentle}
+                  isPast={false}
                   onEdit={editTrip}
                   onRemove={removeTrip}
                 />
@@ -1575,6 +1637,7 @@ export default function CyclePlanner() {
                     predictions={predictions}
                     cycleLength={currentCycleLength}
                     gentle={gentle}
+                    isPast={true}
                     onEdit={editTrip}
                     onRemove={removeTrip}
                   />
@@ -1679,7 +1742,7 @@ export default function CyclePlanner() {
             <p>{t.holidayDisclaimer}</p>
           </div>
         </fieldset>
-        {forecast && currentCycleLength !== null && (currentCycleLength < 21 || currentCycleLength > 35) && (
+        {currentCycleLength !== null && (currentCycleLength < 21 || currentCycleLength > 35) && (
           <div className="warning" role="note">
             <Info size={18} />
             <p>{t.atypical}</p>

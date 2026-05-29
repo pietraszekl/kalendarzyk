@@ -128,6 +128,7 @@ export const copy = {
     pastTrips: "Minione wyjazdy",
     noTrips: "Nie masz jeszcze zapisanych wyjazdów.",
     outsideView: "Poza aktualnym widokiem",
+    outsideViewHint: "Zmień zakres prognozy w Podsumowaniu, aby zobaczyć.",
     overlapsWith: "Nakłada się z prognozą:",
     travelOnlyNote:
       "Dodaj dane cyklu, aby zobaczyć, jak wyjazdy nakładają się z prognozą.",
@@ -156,14 +157,18 @@ export const copy = {
         "Data zakończenia wyjazdu nie może być wcześniejsza niż data rozpoczęcia.",
     },
     weekdays: ["Pn", "Wt", "Śr", "Cz", "Pt", "Sb", "Nd"],
+    weekdaysShort: ["Pn", "Wt", "Śr", "Cz", "Pt", "Sb", "Nd"],
     comfort: {
       title: "Plan komfortu",
       gentleToggleTitle: "Tryb łagodny",
       gentleToggleText:
         "Obniża sugerowaną intensywność w fazie lutealnej i pierwszych dniach miesiączki oraz dodaje wskazówki dotyczące odpoczynku.",
+      gentleAffectsTrips:
+        "Zmiana wpływa od razu na karty wyjazdów (gradient energii i sugerowaną aktywność).",
       gentleOn: "Włączony",
       gentleOff: "Wyłączony",
       suggestedActivity: "Sugerowana aktywność",
+      dayCount: "{count} dni",
       vibes: {
         spa: "Relaks i regeneracja",
         discovery: "Eksploracja i odkrywanie",
@@ -191,6 +196,11 @@ export const copy = {
       manageTitle: "Twoje dane są tutaj",
       manageText:
         "Tutaj zarządzasz cyklem i wyjazdami. Otwórz panel, żeby przejść dalej.",
+      manageTextDesktop:
+        "Tutaj zarządzasz cyklem, wyjazdami i ustawieniami. Korzystaj z zakładek Podsumowanie, Wyjazdy i Cykl.",
+      resetTitle: "Pokaż wprowadzenie ponownie",
+      resetText:
+        "Przeprowadź mnie jeszcze raz przez krótki przewodnik po aplikacji.",
       cycleTabTitle: "Zakładka „Cykl”",
       cycleTabText:
         "Przejdź do zakładki Cykl, aby zapisać swoje typowe parametry i daty miesiączek.",
@@ -338,6 +348,7 @@ export const copy = {
     pastTrips: "Past trips",
     noTrips: "You do not have any saved trips yet.",
     outsideView: "Outside current view",
+    outsideViewHint: "Change the forecast range in Summary to see it.",
     overlapsWith: "Overlaps with forecast:",
     travelOnlyNote:
       "Add cycle details to see how trips overlap with your forecast.",
@@ -365,14 +376,18 @@ export const copy = {
         "The trip end date cannot be earlier than its start date.",
     },
     weekdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    weekdaysShort: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"],
     comfort: {
       title: "Comfort plan",
       gentleToggleTitle: "Gentle mode",
       gentleToggleText:
         "Dims suggested intensity during the luteal phase and the first menstrual days, and adds rest-oriented hints.",
+      gentleAffectsTrips:
+        "The change immediately updates trip cards (energy gradient and suggested activity).",
       gentleOn: "On",
       gentleOff: "Off",
       suggestedActivity: "Suggested activity",
+      dayCount: "{count} days",
       vibes: {
         spa: "Rest and recovery",
         discovery: "Discovery and exploration",
@@ -400,6 +415,10 @@ export const copy = {
       manageTitle: "Your data lives here",
       manageText:
         "This is where you manage your cycle and trips. Open the panel to continue.",
+      manageTextDesktop:
+        "This is where you manage your cycle, trips and settings. Use the Summary, Trips and Cycle tabs.",
+      resetTitle: "Replay the tour",
+      resetText: "Walk me through the quick app tour again.",
       cycleTabTitle: "The Cycle tab",
       cycleTabText:
         "Switch to the Cycle tab to save your typical settings and the dates of past periods.",
