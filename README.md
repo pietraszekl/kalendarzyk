@@ -1,14 +1,15 @@
-# Cycle Compass / Kalendarzyk
+# Cycle Compass / Kompas Cyklu
 
-Private, browser-only travel planning for cycle-aware comfort.
+Considered travel planning that knows your rhythm.
 
-Cycle Compass helps users plan trips and, if they choose, overlay estimated period, ovulation, fertile-window, public-holiday, and personal trip dates. All personal data is stored only in the current browser with `localStorage`; the app has no accounts, backend, analytics, cookies, third-party data sharing, or AI/LLM processing of user data.
+Cycle Compass is a browser-only travel planner that, if you choose, overlays estimated period, ovulation, fertile-window, public-holiday and personal trip dates onto a single calendar. All personal data lives only in the current browser via `localStorage`; the app has no accounts, no backend, no analytics, no cookies, no third-party data sharing, and no AI/LLM processing of user data.
 
 ## Product
 
 - `Cycle Compass` is the English product name.
-- `Kalendarzyk` is the Polish product name.
-- The logo is a compass disc with a blood-drop needle, reinforcing the "Cycle Compass" identity. The same visual is used for the app icon/favicons.
+- `Kompas Cyklu` is the Polish product name.
+- The logo is a compass disc with a blood-drop needle pointing north. The same visual is used for the app icon and favicons.
+- Every screen carries a persistent `● Local only` / `● Lokalnie` trust badge in the topbar so the privacy promise is a visible signal, not just legal copy.
 - The UI is available in Polish and English, with the language choice saved locally.
 
 ## Features
@@ -18,6 +19,7 @@ Cycle Compass helps users plan trips and, if they choose, overlay estimated peri
 - Calendar day cells that overlap a trip show a small battery icon whose fill (`Battery` / `BatteryLow` / `BatteryMedium` / `BatteryFull` / `BatteryCharging`) and colour both reflect the day's energy level.
 - Past trips show only their identity (name, dates, overlap icons) — forecast metadata is hidden once a trip has ended.
 - Returning users can replay the onboarding tour from the Cycle tab.
+- A Summary-tab teaser previews the comfort-plan feature with a sample energy gradient and a "Plan a trip" CTA when the user has cycle data but no trips yet.
 - Toggle Gentle mode (on by default) to dim suggested intensity during the luteal phase and the first menstrual days and to add rest-oriented hints.
 - Add actual period starts from up to 3 months back and keep a local period history.
 - Forecast future period, ovulation, and fertile-window dates from saved history or fallback cycle settings.
@@ -41,10 +43,6 @@ Defence-in-depth headers shipped with the app:
 - `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`
 - A `Permissions-Policy` that disables every browser feature the app does not use (geolocation, camera, microphone, USB, FLoC/Topics, and more)
 - `Strict-Transport-Security` with preload
-
-Two privacy comforts are available from the Cycle tab:
-- **Discreet tab title** swaps the browser tab name to a neutral "Calendar" so the app is not visible in tab switchers or screen-shares.
-- **Panic clear** (`Ctrl/Cmd + Shift + L`) deletes every piece of local data after a single confirm.
 
 ICS exports escape every text field per RFC 5545 and use a neutral PRODID/UID domain so the file does not brand itself to whoever imports it.
 

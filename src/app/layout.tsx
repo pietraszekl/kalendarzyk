@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Kalendarzyk | Wyjazdy i prywatna prognoza cyklu",
+  title: "Kompas Cyklu — Świadome planowanie podróży",
   description:
-    "Prywatny kalendarz wyjazdów z orientacyjną prognozą cyklu, zapisany lokalnie w przeglądarce.",
+    "Plan podróży, który zna Twój rytm. Dni z mocą, dni do regeneracji i terminy cyklu — wszystko na jednym kalendarzu, lokalnie w przeglądarce.",
 };
 
 export default function RootLayout({

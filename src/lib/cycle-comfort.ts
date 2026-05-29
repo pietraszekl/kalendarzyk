@@ -97,12 +97,16 @@ function locateCycle(
 /**
  * Heuristic energy curve. Returns null when the date falls outside any known
  * cycle (e.g. trip far past the forecast horizon).
+ *
+ * The curve always dims the luteal phase and the first two menstrual days
+ * by one notch (formerly the opt-in "gentle mode"). This is the
+ * appropriate default for travel planning — being too optimistic in those
+ * phases causes worse trip experiences than being slightly conservative.
  */
 export function dailyEnergy(
   date: string,
   predictions: CyclePrediction[],
   fallbackCycleLength: number,
-  gentle: boolean,
 ): DailyEnergy | null {
   const located = locateCycle(date, predictions, fallbackCycleLength);
   if (!located) return null;
@@ -146,13 +150,10 @@ export function dailyEnergy(
     else level = 1;
   }
 
-  if (gentle) {
-    // Gentle mode dims luteal + first menstrual days by one notch.
-    const dim =
-      phase === "luteal" || (phase === "menstrual" && cycleDay <= 2);
-    if (dim) {
-      level = Math.max(1, level - 1) as EnergyLevel;
-    }
+  // Always-on dimming of luteal and the first two menstrual days.
+  const dim = phase === "luteal" || (phase === "menstrual" && cycleDay <= 2);
+  if (dim) {
+    level = Math.max(1, level - 1) as EnergyLevel;
   }
 
   return {
@@ -199,12 +200,11 @@ export function buildComfortPlan(
   trip: Trip,
   predictions: CyclePrediction[],
   fallbackCycleLength: number,
-  gentle: boolean,
 ): ComfortPlan | null {
   const daily: DailyEnergy[] = [];
   let cursor = trip.startDate;
   while (cursor <= trip.endDate) {
-    const day = dailyEnergy(cursor, predictions, fallbackCycleLength, gentle);
+    const day = dailyEnergy(cursor, predictions, fallbackCycleLength);
     if (day) daily.push(day);
     cursor = addDays(cursor, 1);
   }

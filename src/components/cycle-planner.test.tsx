@@ -82,10 +82,10 @@ describe("CyclePlanner", () => {
       "aria-selected",
       "true",
     );
-    expect(screen.getByText("Dodaj cykl, aby porównać terminy")).toBeInTheDocument();
+    expect(screen.getByText("Dodaj cykl, żeby zobaczyć więcej")).toBeInTheDocument();
     expect(
-      screen.getByText(/Twoje dane są zapisywane wyłącznie w tej przeglądarce/),
-    ).toHaveTextContent("modele AI/LLM");
+      screen.getByText(/Bez kont, bez chmury — tylko Ty i ta przeglądarka/),
+    ).toBeInTheDocument();
     expect(container.querySelector(".cycle-compass-logo")).toBeInTheDocument();
     expect(container.querySelector(".brand-mark svg")).toHaveAttribute("aria-hidden", "true");
     expect(container.querySelector(".forecast-report")).not.toHaveTextContent(
@@ -286,7 +286,9 @@ describe("CyclePlanner", () => {
     expect(screen.getByText("5 dni")).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText("Usuń miesiączkę: 10 marca 2026"));
-    expect(screen.getByText("Nie masz jeszcze zapisanych miesiączek.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Dodaj swoją pierwszą miesiączkę, żeby zacząć prognozę."),
+    ).toBeInTheDocument();
   });
 
   it("moves focus from trip start to end when adding and editing", async () => {
@@ -396,8 +398,8 @@ describe("CyclePlanner", () => {
 
     fireEvent.change(screen.getByLabelText("Język"), { target: { value: "en" } });
     expect(
-      screen.getByText(/Your data is stored only in this browser/),
-    ).toHaveTextContent("never sent to third parties or processed by AI/LLM models");
+      screen.getByText(/Travel planning that knows your rhythm/),
+    ).toHaveTextContent("No accounts, no cloud");
     expect(screen.getAllByText("Cycle Compass").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Export PNG image" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Export to calendar (.ics)" })).toBeInTheDocument();

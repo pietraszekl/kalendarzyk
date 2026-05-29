@@ -6,8 +6,17 @@ This release expands Cycle Compass / Kalendarzyk from a simple cycle calendar in
 
 ### Brand And Interface
 
-- Introduced the `Cycle Compass` English name while keeping `Kalendarzyk` for Polish users.
-- Redesigned the logo as a compass disc with a blood-drop needle pointing north, reinforcing the "Cycle Compass" identity. The same visual is used as the app icon/favicons.
+- Unified the brand to `Kompas Cyklu` in Polish and `Cycle Compass` in English. The diminutive "Kalendarzyk" working name has been retired from the user surface; storage keys and source identifiers stay as-is so existing users keep their data.
+- Re-positioned around the travel-first USP. The hero tagline is now `Considered travel planning` / `Świadome planowanie podróży`, the H1 sits in the topbar with the brand name + tagline, and the Summary intro headline became `Your season, on your terms` / `Twój sezon, na Twoich warunkach`.
+- Switched the privacy framing from defensive (`never sent to third parties or processed by AI/LLM`) to confident (`No accounts, no cloud — just you and this browser`).
+- Wove the compass metaphor into brand moments without medicalising functional copy: the tagline became `Navigate your year` / `Twój kompas miesięcy`, the onboarding welcome step now starts with `A few quick steps to set your bearing` / `Kilka kroków, żeby wyznaczyć kierunek`, and the final tour step closes with `Bearing set. The map is yours.` / `Kurs wyznaczony. Mapa jest Twoja.`. UI labels stay clean.
+- Added a Summary-tab teaser card that previews the comfort-plan feature with a small sample energy gradient + a "Plan a trip" / "Zaplanuj wyjazd" CTA. It is shown only when the user has cycle data but has not added a trip yet, so the killer feature stops being buried two clicks deep.
+- Added a persistent green-dot trust badge (`● Local only` / `● Lokalnie`) next to the language picker, visible on every screen.
+- Refined empty states across the app — `Your trips will appear here` / `Tu pojawią się Twoje wyjazdy`, `Add a period to start your forecast` / `Dodaj swoją pierwszą miesiączkę, żeby zacząć prognozę`.
+- Onboarding welcome and "Done" steps were rewritten in a calmer, more confident voice; the welcome step in Polish now uses the new brand name (`Witaj w Kompasie Cyklu`).
+- Separated the brand-accent colour (deep sage-teal) from the fertile-layer green (clearly fresher, with a hint of yellow) so the two are no longer visually conflated.
+- Added a subtle italic-serif `Cycle Compass` mark to PNG exports — invisible in the live UI, visible only in the exported file so shared screenshots carry quiet attribution.
+- Redesigned the logo as a compass disc with a blood-drop needle pointing north, reinforcing the brand identity. The same visual is used as the app icon/favicons.
 - Moved supporting controls and explanatory content into a tabbed sidebar/drawer: `Summary`, `Trips`, and `Cycle`.
 - Kept the calendar as the primary view, with compact forecast chips in the calendar header for next period, estimated ovulation, and fertile window.
 - Updated selected marker controls and forecast chips to use tonal text colors that match their soft backgrounds.
@@ -99,8 +108,7 @@ This release expands Cycle Compass / Kalendarzyk from a simple cycle calendar in
 ### Privacy And Safety
 
 - All cycle data, trips, preferences, holiday country settings, and UI choices remain in the current browser via `localStorage`.
-- Added an optional "discreet tab title" — when enabled, the browser tab is named only "Calendar" / "Kalendarz" so the app name is not visible next to other tabs or in screen-shared windows.
-- Added a panic-clear keyboard shortcut: Ctrl/Cmd + Shift + L deletes every piece of local data after a single confirm, designed for the "someone just walked into the room" scenario.
+- Removed the Gentle mode and Privacy sections from the Cycle tab sidebar. The luteal/menstrual energy dimming that the gentle toggle controlled is now always on inside `dailyEnergy`/`buildComfortPlan` (the appropriate default for travel planning), and the discreet-title + panic-clear hotkey UI was removed along with their localStorage keys and i18n strings.
 - The intro copy now explicitly states that data is not sent to third parties and is not processed by AI/LLM models.
 - Safety copy remains visible: cycle, ovulation, and fertility dates are estimates and are not contraception or medical advice.
 

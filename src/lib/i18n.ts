@@ -2,11 +2,15 @@ import type { Layer, Locale } from "@/lib/cycle";
 
 export const copy = {
   pl: {
-    appName: "Kalendarzyk",
-    eyebrow: "Prywatna prognoza cyklu",
-    title: "Sprawdź kolejne etapy swojego cyklu",
+    appName: "Kompas Cyklu",
+    appTagline: "Twój kompas miesięcy",
+    privacyBadge: "Lokalnie",
+    privacyBadgeTitle:
+      "Twoje dane mieszkają wyłącznie w tej przeglądarce. Żadne żądania nie wychodzą na zewnątrz.",
+    eyebrow: "Twój kompas miesięcy",
+    title: "Twój sezon, na Twoich warunkach",
     subtitle:
-      "Planuj wyjazdy i nakładaj na nie orientacyjne terminy miesiączki, owulacji oraz okna płodnego. Twoje dane są zapisywane wyłącznie w tej przeglądarce, nigdy nie są wysyłane do podmiotów trzecich ani przetwarzane przez modele AI/LLM.",
+      "Plan podróży, który zna Twój rytm. Dni z mocą, dni do regeneracji i terminy cyklu — wszystko na jednym kalendarzu. Bez kont, bez chmury — tylko Ty i ta przeglądarka.",
     language: "Język",
     polish: "Polski",
     english: "English",
@@ -30,12 +34,12 @@ export const copy = {
     editPeriod: "Edytuj miesiączkę",
     removePeriod: "Usuń miesiączkę",
     savedPeriods: "Zapisane miesiączki",
-    noPeriods: "Nie masz jeszcze zapisanych miesiączek.",
+    noPeriods: "Dodaj swoją pierwszą miesiączkę, żeby zacząć prognozę.",
     privacy:
-      "Dane cyklu i wyjazdy pozostają lokalnie na tym urządzeniu. Nie wysyłamy ich ani nie zakładamy konta.",
-    noCycleTitle: "Dodaj cykl, aby porównać terminy",
+      "Cykl i wyjazdy mieszkają wyłącznie w tej przeglądarce. Bez kont, bez chmury.",
+    noCycleTitle: "Dodaj cykl, żeby zobaczyć więcej",
     noCycleText:
-      "Kalendarz działa już dla wyjazdów. Po zapisaniu cyklu pokaże również orientacyjne oznaczenia.",
+      "Kalendarz już działa dla wyjazdów. Po dodaniu cyklu pokaże również Twój rytm.",
     forecastTitle: "Prognoza cyklu",
     plannerTitle: "Kalendarz planów",
     nextPeriod: "Następna miesiączka",
@@ -107,7 +111,7 @@ export const copy = {
     predicted: "Przewidywany termin",
     noPeriodLayer: "Warstwa miesiączki jest ukryta.",
     tripSection: "Wyjazdy",
-    tripSectionIntro: "Plany zapisane tylko na tym urządzeniu.",
+    tripSectionIntro: "Plany na ten sezon — tylko na tym urządzeniu.",
     managePlans: "Zarządzaj planami",
     managePanelTitle: "Zarządzaj danymi",
     manageSummaryTab: "Podsumowanie",
@@ -126,7 +130,7 @@ export const copy = {
     stopEditing: "Anuluj edycję",
     plannedTrips: "Planowane wyjazdy",
     pastTrips: "Minione wyjazdy",
-    noTrips: "Nie masz jeszcze zapisanych wyjazdów.",
+    noTrips: "Tu pojawią się Twoje wyjazdy.",
     outsideView: "Poza aktualnym widokiem",
     outsideViewHint: "Zmień zakres prognozy w Podsumowaniu, aby zobaczyć.",
     overlapsWith: "Nakłada się z prognozą:",
@@ -161,23 +165,6 @@ export const copy = {
     weekdaysShort: ["Pn", "Wt", "Śr", "Cz", "Pt", "Sb", "Nd"],
     comfort: {
       title: "Plan komfortu",
-      gentleToggleTitle: "Tryb łagodny",
-      gentleToggleText:
-        "Obniża sugerowaną intensywność w fazie lutealnej i pierwszych dniach miesiączki oraz dodaje wskazówki dotyczące odpoczynku.",
-      gentleAffectsTrips:
-        "Zmiana wpływa od razu na karty wyjazdów (gradient energii i sugerowaną aktywność).",
-      gentleOn: "Włączony",
-      gentleOff: "Wyłączony",
-      privacyTitle: "Prywatność",
-      discreetTitleLabel: "Dyskretny tytuł karty",
-      discreetTitleHint:
-        "Zamienia tytuł zakładki przeglądarki na neutralny „Kalendarz”, więc nazwa aplikacji nie jest widoczna obok innych zakładek.",
-      discreetTitleValue: "Kalendarz",
-      panicClearTitle: "Szybkie wyczyszczenie",
-      panicClearHint:
-        "Wciśnij Ctrl + Shift + L (Cmd + Shift + L na Macu), aby usunąć wszystkie dane jednym ruchem.",
-      panicClearConfirm:
-        "Usunąć wszystkie dane (cykl, wyjazdy, ustawienia)? Tej operacji nie da się cofnąć.",
       suggestedActivity: "Sugerowana aktywność",
       dayCount: "{count} dni",
       vibes: {
@@ -195,15 +182,21 @@ export const copy = {
         4: "Wysoka",
         5: "Szczytowa",
       },
+      teaserEyebrow: "Co czeka na Twoje wyjazdy",
+      teaserTitle: "Prognoza energii na każdy dzień podróży",
+      teaserText:
+        "Każdy zaplanowany wyjazd dostanie codzienny zarys energii i sugerowany charakter dnia. Planuj wokół samopoczucia, nie tylko dat.",
+      teaserCta: "Zaplanuj wyjazd",
+      teaserPreviewAria: "Przykładowa prognoza energii",
     },
     onboarding: {
       next: "Dalej",
       prev: "Wstecz",
       skip: "Pomiń",
       done: "Gotowe",
-      welcomeTitle: "Witaj w Cycle Compass",
+      welcomeTitle: "Witaj w Kompasie Cyklu",
       welcomeText:
-        "Pokażę Ci w kilku krokach, jak korzystać z aplikacji. Cykl i wyjazdy zapisujemy tylko w Twojej przeglądarce — nigdy nie trafiają do nas.",
+        "Kilka kroków, żeby wyznaczyć kierunek. Cykl i wyjazdy mieszkają wyłącznie w Twojej przeglądarce — nigdy do nas nie trafiają.",
       manageTitle: "Twoje dane są tutaj",
       manageText:
         "Tutaj zarządzasz cyklem i wyjazdami. Otwórz panel, żeby przejść dalej.",
@@ -227,17 +220,21 @@ export const copy = {
       tripsTitle: "Planuj wyjazdy",
       tripsText:
         "W zakładce Wyjazdy dodajesz podróże — zobaczysz na kalendarzu, czy nie nakładają się na miesiączkę lub okno płodne.",
-      doneTitle: "To wszystko!",
+      doneTitle: "Kurs wyznaczony",
       doneText:
-        "Gotowe — masz wszystko, czego potrzeba. W każdej chwili możesz wrócić tu i zaktualizować swoje dane. Powodzenia!",
+        "Mapa jest Twoja. Wracaj tu, kiedy chcesz coś dodać lub zmienić.",
     },
   },
   en: {
     appName: "Cycle Compass",
-    eyebrow: "Private cycle forecast",
-    title: "See the next stages of your cycle",
+    appTagline: "Navigate your year",
+    privacyBadge: "Local only",
+    privacyBadgeTitle:
+      "Your data lives only in this browser. No request ever leaves the device.",
+    eyebrow: "Navigate your year",
+    title: "Your season, on your terms",
     subtitle:
-      "Plan trips and overlay estimated period, ovulation and fertile window dates. Your data is stored only in this browser, never sent to third parties or processed by AI/LLM models.",
+      "Travel planning that knows your rhythm. High-energy days, softer ones, and your cycle dates — all on one calendar. No accounts, no cloud — just you and this browser.",
     language: "Language",
     polish: "Polski",
     english: "English",
@@ -261,12 +258,12 @@ export const copy = {
     editPeriod: "Edit period",
     removePeriod: "Delete period",
     savedPeriods: "Saved periods",
-    noPeriods: "You do not have any saved periods yet.",
+    noPeriods: "Add a period to start your forecast.",
     privacy:
-      "Your cycle data and trips remain locally on this device. We do not send them anywhere or create an account.",
-    noCycleTitle: "Add your cycle to compare dates",
+      "Your cycle and trips live only in this browser. No accounts, no cloud.",
+    noCycleTitle: "Add your cycle to see more",
     noCycleText:
-      "The calendar already works for trips. Once you save your cycle, estimated markers will be added.",
+      "The calendar already works for trips. Add your cycle and it will show your rhythm too.",
     forecastTitle: "Cycle forecast",
     plannerTitle: "Plans calendar",
     nextPeriod: "Next period",
@@ -338,7 +335,7 @@ export const copy = {
     predicted: "Predicted date",
     noPeriodLayer: "The period layer is hidden.",
     tripSection: "Trips",
-    tripSectionIntro: "Plans stored only on this device.",
+    tripSectionIntro: "Plans for the season — stored only on this device.",
     managePlans: "Manage plans",
     managePanelTitle: "Manage details",
     manageSummaryTab: "Summary",
@@ -357,7 +354,7 @@ export const copy = {
     stopEditing: "Cancel editing",
     plannedTrips: "Planned trips",
     pastTrips: "Past trips",
-    noTrips: "You do not have any saved trips yet.",
+    noTrips: "Your trips will appear here.",
     outsideView: "Outside current view",
     outsideViewHint: "Change the forecast range in Summary to see it.",
     overlapsWith: "Overlaps with forecast:",
@@ -391,23 +388,6 @@ export const copy = {
     weekdaysShort: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"],
     comfort: {
       title: "Comfort plan",
-      gentleToggleTitle: "Gentle mode",
-      gentleToggleText:
-        "Dims suggested intensity during the luteal phase and the first menstrual days, and adds rest-oriented hints.",
-      gentleAffectsTrips:
-        "The change immediately updates trip cards (energy gradient and suggested activity).",
-      gentleOn: "On",
-      gentleOff: "Off",
-      privacyTitle: "Privacy",
-      discreetTitleLabel: "Discreet browser tab title",
-      discreetTitleHint:
-        "Swap the browser tab title to a neutral 'Calendar' so the app name is not visible next to other tabs.",
-      discreetTitleValue: "Calendar",
-      panicClearTitle: "Quick wipe",
-      panicClearHint:
-        "Press Ctrl + Shift + L (Cmd + Shift + L on Mac) to delete all data in one move.",
-      panicClearConfirm:
-        "Delete all data (cycle, trips, settings)? This cannot be undone.",
       suggestedActivity: "Suggested activity",
       dayCount: "{count} days",
       vibes: {
@@ -425,6 +405,12 @@ export const copy = {
         4: "High",
         5: "Peak",
       },
+      teaserEyebrow: "What's waiting for your trips",
+      teaserTitle: "An energy forecast for every day of the trip",
+      teaserText:
+        "Each planned trip gets a daily energy outlook and a suggested character for the day. Plan around how you'll feel, not just the dates.",
+      teaserCta: "Plan a trip",
+      teaserPreviewAria: "Example energy forecast",
     },
     onboarding: {
       next: "Next",
@@ -433,7 +419,7 @@ export const copy = {
       done: "Done",
       welcomeTitle: "Welcome to Cycle Compass",
       welcomeText:
-        "Let me walk you through the basics in a few quick steps. Your cycle and trip data live only in this browser — nothing is sent to us.",
+        "A few quick steps to set your bearing. Your cycle and trip data live only in this browser — nothing reaches us.",
       manageTitle: "Your data lives here",
       manageText:
         "This is where you manage your cycle and trips. Open the panel to continue.",
@@ -456,9 +442,9 @@ export const copy = {
       tripsTitle: "Plan your trips",
       tripsText:
         "Use the Trips tab to log upcoming travel — the calendar will show whether they overlap with your period or fertile window.",
-      doneTitle: "All set!",
+      doneTitle: "Bearing set",
       doneText:
-        "You're ready to go. Come back any time to update your data. Have a good one!",
+        "The map is yours. Come back any time to add or change something.",
     },
   },
 } as const;

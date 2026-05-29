@@ -93,8 +93,6 @@ const LEGACY_V2_STORAGE_KEY = "kalendarzyk.settings.v2";
 const LEGACY_STORAGE_KEY = "kalendarzyk.settings.v1";
 const LOCALE_KEY = "kalendarzyk.locale";
 const PANEL_TAB_KEY = "kalendarzyk.panelTab";
-const GENTLE_KEY = "kalendarzyk.gentle.v1";
-const DISCREET_KEY = "kalendarzyk.discreet.v1";
 const MOBILE_QUERY = "(max-width: 820px)";
 
 type PanelTab = "summary" | "trips" | "cycle";
@@ -393,6 +391,44 @@ function EnergyBattery({ level }: { level: 1 | 2 | 3 | 4 | 5 }) {
   return <BatteryCharging size={size} strokeWidth={strokeWidth} aria-hidden="true" />;
 }
 
+/**
+ * Editorial preview of the comfort-plan feature, shown on the Summary tab
+ * when the user has cycle data but has not added a trip yet. The strip uses
+ * synthetic levels so the preview reads as an example, not a real forecast.
+ * Clicking the CTA takes the user to the Trips tab where the real planner lives.
+ */
+function ComfortTeaser({
+  locale,
+  onCta,
+}: {
+  locale: Locale;
+  onCta: () => void;
+}) {
+  const t = copy[locale];
+  const exampleLevels: (1 | 2 | 3 | 4 | 5)[] = [4, 5, 5, 4, 3, 2, 2, 3];
+  const previewGradient = buildEnergyGradient(exampleLevels);
+  return (
+    <aside className="comfort-teaser" aria-label={t.comfort.teaserTitle}>
+      <p className="comfort-teaser-eyebrow">{t.comfort.teaserEyebrow}</p>
+      <h3 className="comfort-teaser-title">{t.comfort.teaserTitle}</h3>
+      <div
+        className="energy-strip comfort-teaser-strip"
+        role="img"
+        aria-label={t.comfort.teaserPreviewAria}
+        style={{ background: previewGradient }}
+      />
+      <p className="comfort-teaser-text">{t.comfort.teaserText}</p>
+      <button
+        className="comfort-teaser-cta"
+        onClick={onCta}
+        type="button"
+      >
+        {t.comfort.teaserCta} <ChevronDown size={14} className="comfort-teaser-arrow" />
+      </button>
+    </aside>
+  );
+}
+
 function ConfidenceBars({
   level,
   ariaLabel,
@@ -426,7 +462,6 @@ function CalendarMonth({
   selectedDate,
   onSelectDate,
   cycleLength,
-  gentle,
 }: {
   month: string;
   predictions: CyclePrediction[];
@@ -439,7 +474,6 @@ function CalendarMonth({
   selectedDate: string | null;
   onSelectDate: (date: string) => void;
   cycleLength: number | null;
-  gentle: boolean;
 }) {
   const t = copy[locale];
   const date = parseDateKey(month);
@@ -579,7 +613,7 @@ function CalendarMonth({
                   : [];
                 const energy =
                   matchingTrips.length > 0 && cycleLength
-                    ? dailyEnergy(value, predictions, cycleLength, gentle)
+                    ? dailyEnergy(value, predictions, cycleLength)
                     : null;
                 const description = [
                   ...cycleLayers.map((layer) => layerName(locale, layer)),
@@ -748,7 +782,6 @@ function TripItem({
   readiness,
   predictions,
   cycleLength,
-  gentle,
   isPast,
   onEdit,
   onRemove,
@@ -760,7 +793,6 @@ function TripItem({
   readiness: ReturnType<typeof tripReadiness> | null;
   predictions: CyclePrediction[];
   cycleLength: number | null;
-  gentle: boolean;
   isPast: boolean;
   onEdit: (trip: Trip) => void;
   onRemove: (trip: Trip) => void;
@@ -771,9 +803,9 @@ function TripItem({
   const comfortPlan = useMemo(
     () =>
       !isPast && predictions.length > 0 && cycleLength
-        ? buildComfortPlan(trip, predictions, cycleLength, gentle)
+        ? buildComfortPlan(trip, predictions, cycleLength)
         : null,
-    [trip, predictions, cycleLength, gentle, isPast],
+    [trip, predictions, cycleLength, isPast],
   );
   return (
     <li className="trip-item">
@@ -943,8 +975,6 @@ export default function CyclePlanner() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [panelTab, setPanelTab] = useState<PanelTab>("summary");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [gentle, setGentle] = useState<boolean>(true);
-  const [discreet, setDiscreet] = useState<boolean>(false);
   const reportRef = useRef<HTMLDivElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
   const drawerCloseRef = useRef<HTMLButtonElement>(null);
@@ -990,10 +1020,6 @@ export default function CyclePlanner() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setApp(initialState);
     if (isPanelTab(savedPanelTab)) setPanelTab(savedPanelTab);
-    const savedGentle = localStorage.getItem(GENTLE_KEY);
-    if (savedGentle === "false") setGentle(false);
-    const savedDiscreet = localStorage.getItem(DISCREET_KEY);
-    if (savedDiscreet === "true") setDiscreet(true);
     if (initialState.cycleSettings) {
       setCycleForm({
         cycleLengthDays: String(initialState.cycleSettings.cycleLengthDays),
@@ -1017,51 +1043,6 @@ export default function CyclePlanner() {
     if (ready) document.documentElement.lang = locale;
   }, [locale, ready]);
 
-  // Discreet title: swap the browser tab title to a neutral string so the
-  // app's name (Kalendarzyk / Cycle Compass) is not visible in tab switchers
-  // or screen-shared windows. We restore the original title on cleanup so the
-  // toggle is symmetric — turning it off brings the real title back.
-  useEffect(() => {
-    if (!ready) return;
-    const original = document.title;
-    if (discreet) {
-      document.title = t.comfort.discreetTitleValue;
-    }
-    return () => {
-      document.title = original;
-    };
-  }, [discreet, locale, ready, t.comfort.discreetTitleValue]);
-
-  // Panic clear: Cmd/Ctrl + Shift + L drops every piece of local data after
-  // a single confirm. Designed for the "someone just walked into the room"
-  // scenario where the regular Delete menu takes too many clicks.
-  useEffect(() => {
-    if (!ready) return;
-    function handler(event: KeyboardEvent) {
-      if (!(event.ctrlKey || event.metaKey) || !event.shiftKey) return;
-      if (event.key.toLowerCase() !== "l") return;
-      event.preventDefault();
-      if (window.confirm(t.comfort.panicClearConfirm)) {
-        clearEverything();
-      }
-    }
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [ready, t.comfort.panicClearConfirm]);
-
-  function updateGentle(value: boolean) {
-    setGentle(value);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(GENTLE_KEY, value ? "true" : "false");
-    }
-  }
-
-  function updateDiscreet(value: boolean) {
-    setDiscreet(value);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(DISCREET_KEY, value ? "true" : "false");
-    }
-  }
 
   function launchOnboarding() {
     startOnboarding({
@@ -1372,10 +1353,6 @@ export default function CyclePlanner() {
     localStorage.removeItem(LOCALE_KEY);
     localStorage.removeItem(PANEL_TAB_KEY);
     localStorage.removeItem(ONBOARDING_KEY);
-    localStorage.removeItem(GENTLE_KEY);
-    localStorage.removeItem(DISCREET_KEY);
-    setGentle(true);
-    setDiscreet(false);
     const reset = defaultAppState(detectLocale());
     setApp(reset);
     setCycleForm(EMPTY_CYCLE_FORM);
@@ -1576,23 +1553,6 @@ export default function CyclePlanner() {
           )}
         </section>
 
-        <section className="gentle-mode">
-          <div className="gentle-mode-header">
-            <h3>{t.comfort.gentleToggleTitle}</h3>
-            <label className="gentle-switch">
-              <input
-                type="checkbox"
-                checked={gentle}
-                onChange={(event) => updateGentle(event.target.checked)}
-                aria-label={t.comfort.gentleToggleTitle}
-              />
-              <span aria-hidden="true">{gentle ? t.comfort.gentleOn : t.comfort.gentleOff}</span>
-            </label>
-          </div>
-          <p>{t.comfort.gentleToggleText}</p>
-          <small className="gentle-affect-note">{t.comfort.gentleAffectsTrips}</small>
-        </section>
-
         <section className="reset-onboarding">
           <h3>{t.onboarding.resetTitle}</h3>
           <p>{t.onboarding.resetText}</p>
@@ -1605,23 +1565,6 @@ export default function CyclePlanner() {
           </button>
         </section>
 
-        <section className="privacy-mode">
-          <h3>{t.comfort.privacyTitle}</h3>
-          <label className="gentle-switch privacy-row">
-            <input
-              type="checkbox"
-              checked={discreet}
-              onChange={(event) => updateDiscreet(event.target.checked)}
-              aria-label={t.comfort.discreetTitleLabel}
-            />
-            <span className="privacy-row-label">{t.comfort.discreetTitleLabel}</span>
-          </label>
-          <p className="privacy-hint">{t.comfort.discreetTitleHint}</p>
-          <p className="privacy-hint">
-            <strong>{t.comfort.panicClearTitle}.</strong>{" "}
-            {t.comfort.panicClearHint}
-          </p>
-        </section>
 
       </aside>
     );
@@ -1686,7 +1629,6 @@ export default function CyclePlanner() {
                   readiness={tripReadiness(trip, predictions, holidayEvents, app?.cycleSettings ?? null, sortedPeriodEntries)}
                   predictions={predictions}
                   cycleLength={currentCycleLength}
-                  gentle={gentle}
                   isPast={false}
                   onEdit={editTrip}
                   onRemove={removeTrip}
@@ -1710,8 +1652,7 @@ export default function CyclePlanner() {
                     readiness={tripReadiness(trip, predictions, holidayEvents, app?.cycleSettings ?? null, sortedPeriodEntries)}
                     predictions={predictions}
                     cycleLength={currentCycleLength}
-                    gentle={gentle}
-                    isPast={true}
+                      isPast={true}
                     onEdit={editTrip}
                     onRemove={removeTrip}
                   />
@@ -1727,6 +1668,11 @@ export default function CyclePlanner() {
   function goToCycle() {
     if (isMobile) openDrawer("cycle");
     else selectPanelTab("cycle");
+  }
+
+  function goToTrips() {
+    if (isMobile) openDrawer("trips");
+    else selectPanelTab("trips");
   }
 
   function renderSummaryPanel() {
@@ -1747,7 +1693,7 @@ export default function CyclePlanner() {
       <section className="summary-panel">
         <div className="summary-intro">
           <p className="eyebrow">{t.eyebrow}</p>
-          <h2>{t.appName}</h2>
+          <h2>{t.title}</h2>
           <p>{t.subtitle}</p>
         </div>
         {!forecast && (
@@ -1761,6 +1707,9 @@ export default function CyclePlanner() {
               </button>
             </div>
           </div>
+        )}
+        {forecast && categorizedTrips.planned.length === 0 && (
+          <ComfortTeaser locale={locale} onCta={goToTrips} />
         )}
         <fieldset>
           <legend>{t.showMonths}</legend>
@@ -1867,15 +1816,28 @@ export default function CyclePlanner() {
           <span className="brand-mark" aria-hidden="true">
             <MoonBloomLogo />
           </span>
-          <strong className="brand-name">{t.appName}</strong>
+          <div className="brand-text">
+            <h1 className="brand-name">{t.appName}</h1>
+            <p className="brand-tagline">{t.appTagline}</p>
+          </div>
         </div>
-        <label className="language-picker">
-          <span>{t.language}</span>
-          <select aria-label={t.language} value={locale} onChange={(event) => changeLocale(event.target.value as Locale)}>
-            <option value="pl">{t.polish}</option>
-            <option value="en">{t.english}</option>
-          </select>
-        </label>
+        <div className="topbar-meta">
+          <span
+            className="privacy-badge"
+            title={t.privacyBadgeTitle}
+            aria-label={t.privacyBadgeTitle}
+          >
+            <span aria-hidden="true" className="privacy-badge-dot" />
+            {t.privacyBadge}
+          </span>
+          <label className="language-picker">
+            <span>{t.language}</span>
+            <select aria-label={t.language} value={locale} onChange={(event) => changeLocale(event.target.value as Locale)}>
+              <option value="pl">{t.polish}</option>
+              <option value="en">{t.english}</option>
+            </select>
+          </label>
+        </div>
       </header>
       <div className="workspace">
         {!isMobile && (
@@ -1899,12 +1861,19 @@ export default function CyclePlanner() {
             <div aria-hidden="true" className="capture-header"><h2>{t.calendar}</h2></div>
             <div className="months">
               {calendarWindow.months.map((month) => (
-                <CalendarMonth key={month} month={month} predictions={predictions} trips={app.trips} holidays={holidayEvents} layers={app.visibleLayers} locale={locale} today={today} isMobile={isMobile} selectedDate={selectedDate} onSelectDate={(date) => setSelectedDate((selected) => selected === date ? null : date)} cycleLength={currentCycleLength} gentle={gentle} />
+                <CalendarMonth key={month} month={month} predictions={predictions} trips={app.trips} holidays={holidayEvents} layers={app.visibleLayers} locale={locale} today={today} isMobile={isMobile} selectedDate={selectedDate} onSelectDate={(date) => setSelectedDate((selected) => selected === date ? null : date)} cycleLength={currentCycleLength} />
               ))}
             </div>
             <Legend locale={locale} layers={app.visibleLayers} hasCycle={hasCycleData} hasHolidays={!!app.holidayCountry} />
 
              <p className="privacy-note"><LockKeyhole size={15} />{t.privacy} {t.calendarFootnote}</p>
+            {/* Subtle brand mark visible only in PNG export — quiet
+                attribution that turns shared screenshots into discovery
+                without putting the brand on the live UI. */}
+            <div aria-hidden="true" className="export-brand">
+              <MoonBloomLogo size={24} />
+              <span>{t.appName}</span>
+            </div>
           </div>
         </section>
       </div>
