@@ -142,6 +142,19 @@ export const copy = {
     madeWith: "Stworzone z",
     by: "przez",
     openSource: "Projekt open source na",
+    openSourceBadge: "Open source",
+    manifesto:
+      "Zbudowane prywatnie dla osób, które planują życie wokół własnego rytmu.",
+    howItWorksEyebrow: "Jak to działa",
+    howStep1Title: "Zna Twój cykl",
+    howStep1Text:
+      "Zapisz typową długość i ostatnie miesiączki. Prognoza dopasuje się do Twojego rytmu.",
+    howStep2Title: "Planuje Twoje podróże",
+    howStep2Text:
+      "Dodaj wyjazd, a karta pokaże energię dzień po dniu i sugerowany charakter dni.",
+    howStep3Title: "Zostaje na tym urządzeniu",
+    howStep3Text:
+      "Bez kont, bez chmury, bez analityki. Dane mieszkają wyłącznie w tej przeglądarce.",
     validation: {
       lastPeriodRequired: "Podaj pierwszy dzień ostatniej miesiączki.",
       periodStartRequired: "Podaj pierwszy dzień miesiączki.",
@@ -182,6 +195,9 @@ export const copy = {
         4: "Wysoka",
         5: "Szczytowa",
       },
+      beyondHorizon:
+        "Wyjazd wykracza poza zakres prognozy — zwiększ go w Podsumowaniu, żeby zobaczyć całość.",
+      beyondHorizonShort: "Poza zakresem prognozy",
       teaserEyebrow: "Co czeka na Twoje wyjazdy",
       teaserTitle: "Prognoza energii na każdy dzień podróży",
       teaserText:
@@ -366,6 +382,19 @@ export const copy = {
     madeWith: "Made with",
     by: "by",
     openSource: "Open source project on",
+    openSourceBadge: "Open source",
+    manifesto:
+      "Built privately for people who plan their lives around their own rhythm.",
+    howItWorksEyebrow: "How it works",
+    howStep1Title: "Knows your cycle",
+    howStep1Text:
+      "Save your typical length and recent periods. The forecast adapts to your rhythm.",
+    howStep2Title: "Plans your trips",
+    howStep2Text:
+      "Add a trip and the card shows day-by-day energy and a suggested character for the days.",
+    howStep3Title: "Stays on this device",
+    howStep3Text:
+      "No accounts, no cloud, no analytics. Data lives only in this browser.",
     validation: {
       lastPeriodRequired: "Enter the first day of your last period.",
       periodStartRequired: "Enter the first day of your period.",
@@ -405,6 +434,9 @@ export const copy = {
         4: "High",
         5: "Peak",
       },
+      beyondHorizon:
+        "Trip extends beyond your forecast range — extend it in Summary to see the rest.",
+      beyondHorizonShort: "Beyond forecast range",
       teaserEyebrow: "What's waiting for your trips",
       teaserTitle: "An energy forecast for every day of the trip",
       teaserText:

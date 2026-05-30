@@ -1,6 +1,20 @@
 "use client";
 
 import { toPng } from "html-to-image";
+/**
+ * ICON SYSTEM
+ * -----------
+ * Every icon here carries semantic load (no decorative-only usage).
+ * Canonical sizes are 10 / 14 / 18 / 24 / 56:
+ *   - 10 — inside calendar bar segments (lane height)
+ *   - 14 — inline icons (overlap, legend, layer toggles, trip actions, battery)
+ *   - 18 — action-panel buttons, info chip, mobile manage button, modal close
+ *   - 24 — PNG export brand mark
+ *   - 56 — topbar brand logo
+ * Battery / BatteryLow / BatteryMedium / BatteryFull / BatteryCharging are
+ * deliberate: each one renders a different fill level (L1–L5 of the energy
+ * scale) so the shape carries one extra channel of meaning beyond colour.
+ */
 import {
   Battery,
   BatteryCharging,
@@ -372,7 +386,7 @@ function nextEvent(
   return match ? { start, end: match.fertileEnd } : null;
 }
 
-function LayerIcon({ layer, size = 15 }: { layer: Layer; size?: number }) {
+function LayerIcon({ layer, size = 14 }: { layer: Layer; size?: number }) {
   if (layer === "period") return <Droplets size={size} />;
   if (layer === "fertile") return <Leaf size={size} />;
   if (layer === "ovulation") return <Sparkles size={size} />;
@@ -381,8 +395,11 @@ function LayerIcon({ layer, size = 15 }: { layer: Layer; size?: number }) {
 }
 
 function EnergyBattery({ level }: { level: 1 | 2 | 3 | 4 | 5 }) {
-  const size = 15;
-  const strokeWidth = 1.8;
+  const size = 14;
+  // Thicker stroke than other inline icons — the battery is a tiny indicator
+  // in a busy calendar cell and needs to read as "stamped on" rather than
+  // "sketched in".
+  const strokeWidth = 2.4;
   if (level === 1) return <Battery size={size} strokeWidth={strokeWidth} aria-hidden="true" />;
   if (level === 2) return <BatteryLow size={size} strokeWidth={strokeWidth} aria-hidden="true" />;
   if (level === 3) return <BatteryMedium size={size} strokeWidth={strokeWidth} aria-hidden="true" />;
@@ -425,6 +442,36 @@ function ComfortTeaser({
       >
         {t.comfort.teaserCta} <ChevronDown size={14} className="comfort-teaser-arrow" />
       </button>
+    </aside>
+  );
+}
+
+/**
+ * Three-pillar editorial block under the Summary intro — the closest thing
+ * this app has to a "landing narrative". Cycle-aware planning + travel-first
+ * positioning + privacy promise, each in one line. Always visible: it costs
+ * little, gives returning users context, and lets first-time visitors who
+ * skip the tour still understand what the product is for.
+ */
+function HowItWorks({ locale }: { locale: Locale }) {
+  const t = copy[locale];
+  const steps = [
+    { icon: <Droplets size={18} aria-hidden="true" />, title: t.howStep1Title, text: t.howStep1Text },
+    { icon: <Plane size={18} aria-hidden="true" />, title: t.howStep2Title, text: t.howStep2Text },
+    { icon: <LockKeyhole size={18} aria-hidden="true" />, title: t.howStep3Title, text: t.howStep3Text },
+  ];
+  return (
+    <aside className="how-it-works" aria-label={t.howItWorksEyebrow}>
+      <p className="how-it-works-eyebrow">{t.howItWorksEyebrow}</p>
+      <ol className="how-it-works-grid">
+        {steps.map((step) => (
+          <li className="how-it-works-step" key={step.title}>
+            <span className="how-it-works-icon">{step.icon}</span>
+            <strong className="how-it-works-title">{step.title}</strong>
+            <p className="how-it-works-text">{step.text}</p>
+          </li>
+        ))}
+      </ol>
     </aside>
   );
 }
@@ -624,19 +671,12 @@ function CalendarMonth({
                   .filter(Boolean)
                   .join(", ");
                 const isToday = value === today;
-                return (
-                  <button
-                    aria-label={
-                      description
-                        ? `${formatDate(value, locale)}: ${description}`
-                        : formatDate(value, locale)
-                    }
-                    aria-expanded={isMobile ? selectedDate === value : undefined}
-                    className={`day${isToday ? " day-today" : ""}${isWeekend ? " day-weekend" : ""}`}
-                    key={value}
-                    onClick={() => isMobile && onSelectDate(value)}
-                    type="button"
-                  >
+                const dayLabel = description
+                  ? `${formatDate(value, locale)}: ${description}`
+                  : formatDate(value, locale);
+                const dayClassName = `day${isToday ? " day-today" : ""}${isWeekend ? " day-weekend" : ""}`;
+                const dayInner = (
+                  <>
                     <span className="day-number">{parseDateKey(value).getDate()}</span>
                     {energy && (
                       <span
@@ -650,7 +690,35 @@ function CalendarMonth({
                     {(layout.hiddenByDate[value]?.length ?? 0) > 0 && (
                       <small className="day-overflow">+{layout.hiddenByDate[value].length}</small>
                     )}
+                  </>
+                );
+                // On mobile, tapping a day expands a details panel — render an
+                // actual <button> so it carries the right semantics, focus
+                // ring and pointer cursor. On desktop there is nothing to
+                // activate (all info is already visible in the bars below),
+                // so we render a non-interactive <div role="gridcell"> instead.
+                // That removes the misleading pointer cursor and the empty
+                // click target.
+                return isMobile ? (
+                  <button
+                    aria-expanded={selectedDate === value}
+                    aria-label={dayLabel}
+                    className={dayClassName}
+                    key={value}
+                    onClick={() => onSelectDate(value)}
+                    type="button"
+                  >
+                    {dayInner}
                   </button>
+                ) : (
+                  <div
+                    aria-label={dayLabel}
+                    className={dayClassName}
+                    key={value}
+                    role="gridcell"
+                  >
+                    {dayInner}
+                  </div>
                 );
               })}
             </div>
@@ -709,7 +777,7 @@ function Legend({
         .filter((layer) => layers[layer])
         .map((layer) => (
           <li className={`legend-${layer}`} key={layer}>
-            <LayerIcon layer={layer} size={12} />
+            <LayerIcon layer={layer} size={14} />
             {layerName(locale, layer)}
           </li>
         ))}
@@ -736,19 +804,19 @@ function ForecastChips({
       key: "period",
       label: t.nextPeriod,
       value: nextPeriod ? formatRange(nextPeriod.periodStart, nextPeriod.periodEnd, locale) : "-",
-      icon: <Droplets size={15} />,
+      icon: <Droplets size={14} />,
     },
     {
       key: "ovulation",
       label: t.nextOvulation,
       value: nextOvulation ? formatDate(nextOvulation.start, locale) : "-",
-      icon: <Sparkles size={15} />,
+      icon: <Sparkles size={14} />,
     },
     {
       key: "fertile",
       label: t.nextFertile,
       value: nextFertile ? formatRange(nextFertile.start, nextFertile.end, locale) : "-",
-      icon: <Leaf size={15} />,
+      icon: <Leaf size={14} />,
     },
   ];
 
@@ -818,7 +886,7 @@ function TripItem({
               <span className="overlap-icons" aria-label={t.overlapsWith}>
                 {overlap.map((layer) => (
                   <span className={`overlap-${layer}`} key={layer} title={layerName(locale, layer)}>
-                    <LayerIcon layer={layer} size={13} />
+                    <LayerIcon layer={layer} size={14} />
                     <span className="sr-only">{layerName(locale, layer)}</span>
                   </span>
                 ))}
@@ -828,7 +896,7 @@ function TripItem({
               <span className="overlap-icons" aria-label={t.holidayOverlaps}>
                 {readiness.holidayOverlaps.slice(0, 3).map((holiday) => (
                   <span className="overlap-holidays" key={holiday.id} title={holiday.name}>
-                    <CalendarDays size={13} />
+                    <CalendarDays size={14} />
                     <span className="sr-only">{holiday.name}</span>
                   </span>
                 ))}
@@ -866,30 +934,41 @@ function TripItem({
               aria-label={t.comfort.energyAriaStrip}
               style={{
                 background: buildEnergyGradient(
-                  comfortPlan.daily.map((day) => day.level),
+                  comfortPlan.daily.map((day) => day.energy?.level ?? null),
                 ),
               }}
             />
             <div className="energy-strip-labels">
-              {comfortPlan.daily.map((day) => (
-                <div
-                  className="energy-label"
-                  key={day.date}
-                  title={`${formatDate(day.date, locale, {
-                    weekday: "short",
-                    day: "numeric",
-                    month: "short",
-                  })} — ${t.comfort.energyLabels[day.level]}`}
-                >
-                  <span className="energy-weekday">
-                    {formatWeekdayShort(day.date, locale)}
-                  </span>
-                  <span className="energy-daynum">
-                    {parseDateKey(day.date).getDate()}
-                  </span>
-                </div>
-              ))}
+              {comfortPlan.daily.map((day) => {
+                const isUnknown = day.energy === null;
+                const dayLabel = formatDate(day.date, locale, {
+                  weekday: "short",
+                  day: "numeric",
+                  month: "short",
+                });
+                return (
+                  <div
+                    className={`energy-label${isUnknown ? " energy-label-unknown" : ""}`}
+                    key={day.date}
+                    title={
+                      isUnknown
+                        ? `${dayLabel} — ${t.comfort.beyondHorizonShort}`
+                        : `${dayLabel} — ${t.comfort.energyLabels[day.energy!.level]}`
+                    }
+                  >
+                    <span className="energy-weekday">
+                      {formatWeekdayShort(day.date, locale)}
+                    </span>
+                    <span className="energy-daynum">
+                      {parseDateKey(day.date).getDate()}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
+            {comfortPlan.beyondHorizon > 0 && (
+              <p className="trip-strip-beyond">{t.comfort.beyondHorizon}</p>
+            )}
           </section>
         )}
 
@@ -1640,7 +1719,7 @@ export default function CyclePlanner() {
           )}
           {categorizedTrips.past.length > 0 && (
             <details className="past-trips">
-              <summary><ChevronDown size={15} />{t.pastTrips} ({categorizedTrips.past.length})</summary>
+              <summary><ChevronDown size={14} />{t.pastTrips} ({categorizedTrips.past.length})</summary>
               <ul className="trip-list">
                 {categorizedTrips.past.map((trip) => (
                   <TripItem
@@ -1696,6 +1775,8 @@ export default function CyclePlanner() {
           <h2>{t.title}</h2>
           <p>{t.subtitle}</p>
         </div>
+        <HowItWorks locale={locale} />
+
         {!forecast && (
           <div className="calendar-note" role="note">
             <Droplets size={18} />
@@ -1773,9 +1854,9 @@ export default function CyclePlanner() {
         )}
         {hasData && (
           <div className="actions-panel">
-            <button aria-label={t.exportAria} onClick={() => setShowExport(true)} title={t.exportAria} type="button"><Download size={19} /></button>
-            <button aria-label={t.exportIcsAria} onClick={downloadIcs} title={t.exportIcsAria} type="button"><CalendarPlus size={19} /></button>
-            <button aria-label={t.deleteAria} className="delete-button" onClick={() => setShowDelete(true)} title={t.deleteAria} type="button"><Trash2 size={19} /></button>
+            <button aria-label={t.exportAria} onClick={() => setShowExport(true)} title={t.exportAria} type="button"><Download size={18} /></button>
+            <button aria-label={t.exportIcsAria} onClick={downloadIcs} title={t.exportIcsAria} type="button"><CalendarPlus size={18} /></button>
+            <button aria-label={t.deleteAria} className="delete-button" onClick={() => setShowDelete(true)} title={t.deleteAria} type="button"><Trash2 size={18} /></button>
           </div>
         )}
       </section>
@@ -1866,7 +1947,7 @@ export default function CyclePlanner() {
             </div>
             <Legend locale={locale} layers={app.visibleLayers} hasCycle={hasCycleData} hasHolidays={!!app.holidayCountry} />
 
-             <p className="privacy-note"><LockKeyhole size={15} />{t.privacy} {t.calendarFootnote}</p>
+             <p className="privacy-note"><LockKeyhole size={14} />{t.privacy} {t.calendarFootnote}</p>
             {/* Subtle brand mark visible only in PNG export — quiet
                 attribution that turns shared screenshots into discovery
                 without putting the brand on the live UI. */}
@@ -1882,7 +1963,7 @@ export default function CyclePlanner() {
           <section aria-labelledby="drawer-title" aria-modal="true" className="mobile-drawer" ref={drawerRef} role="dialog">
             <header className="drawer-header">
               <h2 id="drawer-title">{t.managePanelTitle}</h2>
-              <button aria-label={t.closePanel} onClick={() => setDrawerOpen(false)} ref={drawerCloseRef} type="button"><X size={19} /></button>
+              <button aria-label={t.closePanel} onClick={() => setDrawerOpen(false)} ref={drawerCloseRef} type="button"><X size={18} /></button>
             </header>
             {renderPanelTabs("drawer")}
             {renderPanelContent("drawer")}
@@ -1916,11 +1997,21 @@ export default function CyclePlanner() {
         </div>
       )}
       <footer className="site-footer">
-        <span>{t.madeWith} <span aria-label="love">&#10084;&#65039;</span> {t.by}{" "}
-        <a href="https://digitalhabitat.it/" target="_blank" rel="noopener noreferrer">Digital Habitat</a></span>
-        <span className="footer-separator" aria-hidden="true">·</span>
-        <span>{t.openSource}{" "}
-        <a href="https://github.com/pietraszekl/kalendarzyk" target="_blank" rel="noopener noreferrer">GitHub</a></span>
+        <p className="site-footer-manifesto">{t.manifesto}</p>
+        <div className="site-footer-meta">
+          <a
+            className="oss-badge"
+            href="https://github.com/pietraszekl/kalendarzyk"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            <span aria-hidden="true" className="oss-badge-dot" />
+            {t.openSourceBadge}
+          </a>
+          <span className="footer-separator" aria-hidden="true">·</span>
+          <span>{t.madeWith} <span aria-label="love">&#10084;&#65039;</span> {t.by}{" "}
+            <a href="https://digitalhabitat.it/" target="_blank" rel="noopener noreferrer">Digital Habitat</a></span>
+        </div>
       </footer>
     </main>
   );

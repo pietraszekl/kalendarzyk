@@ -22,11 +22,18 @@ export type EnergyLevel = 1 | 2 | 3 | 4 | 5;
  * Hex colors for each energy level. Single source of truth used by both the
  * sidebar gradient strip and the in-calendar trip bar gradient.
  */
+/**
+ * Energy palette mirrored from the `--energy-{1..5}` CSS tokens. Kept here as
+ * raw hex because this constant feeds the inline `background` style on the
+ * gradient strip (CSS variables cannot be interpolated into a runtime
+ * `linear-gradient(...)` value the same way). Keep these values in sync with
+ * the tokens in `src/app/globals.css`.
+ */
 export const ENERGY_HEX: Record<EnergyLevel, string> = {
   1: "#c97a7a",
   2: "#d8a374",
   3: "#c9b06f",
-  4: "#6fa68b",
+  4: "#7da890",
   5: "#24584f",
 };
 
@@ -56,10 +63,22 @@ export interface DailyEnergy {
   level: EnergyLevel;
 }
 
+/**
+ * One day inside a trip's comfort plan. `energy` is null when the day falls
+ * beyond the active forecast horizon — we still keep the date so the UI can
+ * render the full length of the trip without silently truncating.
+ */
+export interface ComfortPlanDay {
+  date: string;
+  energy: DailyEnergy | null;
+}
+
 export interface ComfortPlan {
   vibe: TripVibe;
   dominantPhase: CyclePhase;
-  daily: DailyEnergy[];
+  daily: ComfortPlanDay[];
+  /** Number of days inside `daily` whose `energy` is null. */
+  beyondHorizon: number;
 }
 
 function daysBetween(start: string, end: string): number {
@@ -201,22 +220,30 @@ export function buildComfortPlan(
   predictions: CyclePrediction[],
   fallbackCycleLength: number,
 ): ComfortPlan | null {
-  const daily: DailyEnergy[] = [];
+  const daily: ComfortPlanDay[] = [];
   let cursor = trip.startDate;
   while (cursor <= trip.endDate) {
-    const day = dailyEnergy(cursor, predictions, fallbackCycleLength);
-    if (day) daily.push(day);
+    const energy = dailyEnergy(cursor, predictions, fallbackCycleLength);
+    daily.push({ date: cursor, energy });
     cursor = addDays(cursor, 1);
   }
   if (daily.length === 0) return null;
 
-  const phases = daily.map((day) => day.phase);
+  // Vibe / dominant phase are derived only from the days we actually know.
+  // If no day has data (trip entirely beyond the horizon), there is no
+  // meaningful plan to show — the caller hides the section.
+  const known = daily.flatMap((day) => (day.energy ? [day.energy] : []));
+  if (known.length === 0) return null;
+
+  const phases = known.map((day) => day.phase);
   const dominantPhase = (dominant(phases) ?? "follicular") as CyclePhase;
   const vibe = phaseToVibe(dominantPhase);
+  const beyondHorizon = daily.length - known.length;
 
   return {
     vibe,
     dominantPhase,
     daily,
+    beyondHorizon,
   };
 }

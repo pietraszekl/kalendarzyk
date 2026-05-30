@@ -2,6 +2,8 @@
 @import "driver.js/dist/driver.css";
 
 :root {
+  /* ──────────────────────────────────────────────────────────────────────
+     COLOUR — Brand + surfaces (chrome). */
   --background: #fbf8f5;
   --surface: #ffffff;
   --surface-muted: #f4f0eb;
@@ -10,11 +12,12 @@
   --border: #ded7d0;
   --accent: #24584f;
   --accent-hover: #193f38;
+
+  /* Cycle layer colours (categorical, meaningful). Fertile was shifted
+     away from the brand accent so the two greens can no longer be
+     confused — accent is deep teal-sage, fertile is fresher green. */
   --period: #b44d64;
   --period-soft: #f5d7de;
-  /* Fertile shifted away from the brand accent so the two greens can no
-     longer be confused — accent is a deep teal-sage; fertile is a clearly
-     fresher green-sage with a hint of yellow. */
   --fertile: #4f8e6e;
   --fertile-soft: #dfeee5;
   --ovulation: #936637;
@@ -26,7 +29,52 @@
   --warning: #845f25;
   --warning-soft: #fbf1dd;
   --danger: #9c354d;
+
+  /* Energy palette (continuous scale). Deliberately distinct from the
+     cycle-layer palette: cycle is saturated categorical, energy is a
+     warm-to-cool ramp with desaturated middles and a brand-teal peak.
+     L4 was shifted from #6fa68b to a lighter, less-saturated sage so it
+     stops echoing the fertile-layer green. */
+  --energy-1: #c97a7a;
+  --energy-2: #d8a374;
+  --energy-3: #c9b06f;
+  --energy-4: #7da890;
+  --energy-5: var(--accent);
+  --energy-off: rgb(36 88 79 / 14%);
+
   --shadow: 0 1px 2px rgb(39 33 28 / 5%), 0 18px 40px rgb(39 33 28 / 5%);
+
+  /* ──────────────────────────────────────────────────────────────────────
+     RADIUS — 5 steps. --r-sm for compact UI (day cells, dots), --r-md
+     for chips, --r-lg for trip cards, --r-xl for sidebar panels,
+     --r-pill for badges. */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 14px;
+  --r-xl: 18px;
+  --r-pill: 999px;
+
+  /* ──────────────────────────────────────────────────────────────────────
+     TYPE SCALE — 7 steps. --fs-sm is the WCAG-safe minimum for body
+     text; --fs-xs / --fs-micro are for labels, abbreviations, and other
+     non-essential micro-copy. */
+  --fs-micro: 0.7rem;
+  --fs-xs: 0.78rem;
+  --fs-sm: 0.875rem;
+  --fs-base: 1rem;
+  --fs-md: 1.125rem;
+  --fs-lg: 1.25rem;
+  --fs-xl: 1.5rem;
+
+  /* ──────────────────────────────────────────────────────────────────────
+     SPACING — 4-px modular, 6 steps. Sibling spacing uses --s-2/--s-3,
+     section spacing uses --s-4, hero/page padding uses --s-5+. */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
 }
 
 * {
@@ -82,13 +130,13 @@ button:disabled {
   display: flex;
   justify-content: space-between;
   min-height: 66px;
-  padding-bottom: 16px;
+  padding-bottom: var(--s-4);
 }
 
 .brand {
   align-items: center;
   display: flex;
-  gap: 12px;
+  gap: var(--s-3);
   min-width: 0;
 }
 
@@ -104,7 +152,7 @@ button:disabled {
 .brand-name {
   color: var(--foreground);
   font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
-  font-size: 1.5rem;
+  font-size: var(--fs-xl);
   font-style: italic;
   font-weight: 600;
   letter-spacing: -0.055em;
@@ -114,7 +162,7 @@ button:disabled {
 
 .brand-tagline {
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0;
   line-height: 1.2;
   margin: 0;
@@ -137,7 +185,7 @@ button:disabled {
 .topbar-meta {
   align-items: center;
   display: flex;
-  gap: 14px;
+  gap: var(--s-3);
 }
 
 /* Compact, persistent trust mark: green dot + label.
@@ -147,11 +195,11 @@ button:disabled {
   align-items: center;
   background: rgb(79 142 110 / 8%);
   border: 1px solid rgb(79 142 110 / 22%);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   color: var(--fertile);
   cursor: help;
   display: inline-flex;
-  font-size: 0.74rem;
+  font-size: var(--fs-xs);
   font-weight: 600;
   gap: 6px;
   letter-spacing: 0.01em;
@@ -204,12 +252,12 @@ button:disabled {
   font-weight: 400;
   letter-spacing: -0.05em;
   line-height: 1.08;
-  margin: 0 0 13px;
+  margin: 0 0 var(--s-3);
 }
 
 .intro > p:last-child {
   color: var(--muted);
-  font-size: 1rem;
+  font-size: var(--fs-base);
   line-height: 1.55;
   margin: 0;
 }
@@ -230,7 +278,7 @@ button:disabled {
 .results {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--r-xl);
   box-shadow: var(--shadow);
 }
 
@@ -245,7 +293,7 @@ button:disabled {
 .sidebar-panel {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--r-xl);
   box-shadow: var(--shadow);
   min-width: 0;
   position: sticky;
@@ -506,9 +554,9 @@ button:disabled {
 .period-item {
   background: #fafbf8;
   border: 1px solid rgb(36 88 79 / 10%);
-  border-radius: 14px;
+  border-radius: var(--r-lg);
   box-shadow: 0 1px 0 rgb(36 88 79 / 3%);
-  padding: 16px;
+  padding: var(--s-4);
 }
 
 /* Period entries match the trip card layout — actions absolute top-right,
@@ -516,14 +564,14 @@ button:disabled {
 .period-item {
   background: #fff7f8;
   border-color: #efd5dc;
-  padding: 14px 16px;
+  padding: var(--s-4);
   position: relative;
 }
 
 .period-item > .trip-actions {
   position: absolute;
-  right: 12px;
-  top: 12px;
+  right: var(--s-3);
+  top: var(--s-3);
 }
 
 .period-item .trip-details {
@@ -539,8 +587,8 @@ button:disabled {
 
 .trip-item > .trip-actions {
   position: absolute;
-  right: 12px;
-  top: 12px;
+  right: var(--s-3);
+  top: var(--s-3);
 }
 
 .trip-item .trip-header {
@@ -554,19 +602,19 @@ button:disabled {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--s-4);
   min-width: 0;
 }
 
 .trip-header {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--s-1);
 }
 
 .trip-name {
   color: var(--foreground);
-  font-size: 1.05rem;
+  font-size: var(--fs-md);
   font-weight: 700;
   letter-spacing: -0.01em;
   overflow: hidden;
@@ -579,19 +627,19 @@ button:disabled {
   color: var(--muted);
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--s-2);
 }
 
 .trip-date {
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   font-weight: 500;
 }
 
 /* Small label-style eyebrow — used above the vibe value and inline
-   next to the confidence bars. Sized at WCAG-safe minimum body text. */
+   next to the confidence bars. WCAG-safe body minimum. */
 .trip-eyebrow {
   color: var(--muted);
-  font-size: 0.875rem;
+  font-size: var(--fs-sm);
   font-weight: 500;
   letter-spacing: 0;
 }
@@ -600,12 +648,12 @@ button:disabled {
 .trip-vibe {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--s-1);
 }
 
 .trip-vibe-value {
   color: var(--accent);
-  font-size: 1.05rem;
+  font-size: var(--fs-md);
   font-weight: 700;
   letter-spacing: -0.005em;
   margin: 0;
@@ -616,14 +664,14 @@ button:disabled {
 .trip-strip {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--s-2);
 }
 
 /* The confidence row is a quiet footer — label + bars on one line. */
 .trip-confidence {
   align-items: center;
   display: flex;
-  gap: 8px;
+  gap: var(--s-2);
 }
 
 .outside-view {
@@ -2094,7 +2142,7 @@ legend {
 /* Day-by-day energy gradient strip — the visual hero of the trip card.
    A fully-rounded pill so the colour transitions feel soft. */
 .energy-strip {
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   box-shadow: inset 0 0 0 1px rgb(36 88 79 / 6%);
   height: 16px;
   width: 100%;
@@ -2116,14 +2164,32 @@ legend {
 
 .energy-weekday {
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: var(--fs-micro);
   font-weight: 500;
 }
 
 .energy-daynum {
   color: var(--foreground);
-  font-size: 0.82rem;
+  font-size: var(--fs-xs);
   font-weight: 600;
+}
+
+/* Beyond-horizon labels: the day still exists on the strip (so the column
+   widths add up) but its colour is faded to communicate "we don't know
+   what your body will be doing yet". The hover/title spells it out. */
+.energy-label-unknown {
+  opacity: 0.38;
+}
+
+/* Quiet footnote under the strip when part of the trip is outside the
+   current forecast range. Restrained voice — no exclamation, no alarm
+   colours; just a calm pointer to the Summary setting that fixes it. */
+.trip-strip-beyond {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-style: italic;
+  line-height: 1.4;
+  margin: var(--s-2) 0 0;
 }
 
 
@@ -2139,11 +2205,11 @@ legend {
   top: 6px;
 }
 
-.day-comfort.energy-1 { color: #c97a7a; }
-.day-comfort.energy-2 { color: #d8a374; }
-.day-comfort.energy-3 { color: #c9b06f; }
-.day-comfort.energy-4 { color: #6fa68b; }
-.day-comfort.energy-5 { color: var(--accent); }
+.day-comfort.energy-1 { color: var(--energy-1); }
+.day-comfort.energy-2 { color: var(--energy-2); }
+.day-comfort.energy-3 { color: var(--energy-3); }
+.day-comfort.energy-4 { color: var(--energy-4); }
+.day-comfort.energy-5 { color: var(--energy-5); }
 
 /* On the highlighted "today" cell (dark accent background) the battery
    icon needs a light colour to stay legible. The drop-shadow also helps
@@ -2207,6 +2273,13 @@ legend {
 .reset-onboarding button {
   align-self: flex-start;
   margin-top: 4px;
+  align-items: center;
+  height: 48px;
+  margin-top: 5px;
+  font-size: .75rem;
+  font-weight: 600;
+  padding: 10px;
+  width: 100%;
 }
 
 /* Loading shell shown briefly during initial hydration — centered logo with
@@ -2284,16 +2357,16 @@ legend {
       rgb(255 255 255 / 90%) 0%,
       rgb(248 244 240 / 90%) 100%);
   border: 1px solid rgb(36 88 79 / 12%);
-  border-radius: 14px;
+  border-radius: var(--r-lg);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--s-3);
   padding: 18px 20px;
 }
 
 .comfort-teaser-eyebrow {
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: var(--fs-micro);
   font-weight: 600;
   letter-spacing: 0.06em;
   margin: 0;
@@ -2303,7 +2376,7 @@ legend {
 .comfort-teaser-title {
   color: var(--foreground);
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 1.15rem;
+  font-size: var(--fs-md);
   font-weight: 400;
   letter-spacing: -0.01em;
   line-height: 1.25;
@@ -2311,14 +2384,14 @@ legend {
 }
 
 .comfort-teaser-strip {
-  margin-top: 4px;
+  margin-top: var(--s-1);
   /* Soft glow so the preview reads as a "sample" not the real thing. */
   opacity: 0.92;
 }
 
 .comfort-teaser-text {
   color: var(--muted);
-  font-size: 0.86rem;
+  font-size: var(--fs-sm);
   line-height: 1.55;
   margin: 0;
 }
@@ -2328,13 +2401,13 @@ legend {
   align-self: flex-start;
   background: transparent;
   border: 1px solid var(--accent);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   color: var(--accent);
   display: inline-flex;
-  font-size: 0.84rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   gap: 4px;
-  margin-top: 4px;
+  margin-top: var(--s-1);
   padding: 6px 12px 6px 14px;
   transition: background 150ms ease, color 150ms ease;
 }
@@ -2351,4 +2424,208 @@ legend {
 
 .comfort-teaser-cta:hover .comfort-teaser-arrow {
   transform: rotate(-90deg) translateY(-2px);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   How-it-works editorial trio under the Summary intro.
+   Three-pillar value statement: cycle / travel / privacy. Restrained
+   typography, accent-tinted icons, no card decoration so the block reads
+   like a magazine kicker rather than a marketing banner. */
+.how-it-works {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  margin-top: var(--s-5);
+}
+
+.how-it-works-eyebrow {
+  color: var(--accent);
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+/* Stacked single-column layout — the trio lives inside a ~318px sidebar
+   panel, so a 3-column grid squeezes Polish titles like "Planuje Twoje
+   podróże" into 3-line wraps. One row per pillar, icon on the left,
+   title + text stacked on the right reads cleanly at any panel width. */
+.how-it-works-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.how-it-works-step {
+  display: grid;
+  gap: 2px var(--s-3);
+  grid-template-columns: 32px 1fr;
+  min-width: 0;
+}
+
+.how-it-works-icon {
+  align-items: center;
+  align-self: start;
+  background: rgb(36 88 79 / 7%);
+  border-radius: var(--r-pill);
+  color: var(--accent);
+  display: inline-flex;
+  grid-column: 1;
+  grid-row: 1 / 3;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
+.how-it-works-title {
+  align-self: center;
+  color: var(--foreground);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  grid-column: 2;
+  grid-row: 1;
+  letter-spacing: -0.005em;
+}
+
+.how-it-works-text {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  grid-column: 2;
+  grid-row: 2;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Footer rewrite: manifesto line + meta row.
+   The manifesto sits above; the meta row carries the visible Open source
+   badge (no longer hidden behind a "click GitHub to find out") and the
+   "Made with ❤ by Digital Habitat" credit. */
+.site-footer {
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  margin-top: var(--s-6);
+  padding-top: var(--s-4);
+}
+
+.site-footer-manifesto {
+  color: var(--foreground);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: var(--fs-base);
+  font-style: italic;
+  line-height: 1.5;
+  margin: 0;
+  max-width: 560px;
+}
+
+.site-footer-meta {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--fs-xs);
+  gap: var(--s-2);
+}
+
+/* Visible Open source badge — quiet but unmistakable signal that this app
+   can be audited, not just "the project happens to be on GitHub". */
+.oss-badge {
+  align-items: center;
+  background: rgb(36 88 79 / 6%);
+  border: 1px solid rgb(36 88 79 / 18%);
+  border-radius: var(--r-pill);
+  color: var(--accent);
+  display: inline-flex;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  gap: 6px;
+  letter-spacing: 0.01em;
+  padding: 4px 10px 4px 8px;
+  text-decoration: none;
+  transition: background 150ms ease, transform 150ms ease;
+}
+
+.oss-badge:hover {
+  background: rgb(36 88 79 / 12%);
+  transform: translateY(-1px);
+}
+
+.oss-badge-dot {
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgb(36 88 79 / 12%);
+  display: inline-block;
+  height: 6px;
+  width: 6px;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Motion polish — subtle, premium, never showy.
+   Every transition stays under 220ms and uses ease-out so nothing feels
+   slow. No element ever rotates, bounces or scales aggressively.
+   Respect prefers-reduced-motion (below). */
+.trip-item {
+  transition: transform 180ms ease-out, box-shadow 180ms ease-out;
+}
+
+.trip-item:hover {
+  box-shadow: 0 1px 0 rgb(36 88 79 / 4%), 0 8px 20px rgb(36 88 79 / 7%);
+  transform: translateY(-1px);
+}
+
+.modal {
+  animation: modal-in 200ms ease-out;
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.modal-backdrop {
+  animation: backdrop-in 160ms ease-out;
+}
+
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.mobile-drawer {
+  animation: drawer-up 220ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+@keyframes drawer-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Anyone who has reduced-motion turned on gets a clean, static UI. */
+@media (prefers-reduced-motion: reduce) {
+  .trip-item,
+  .modal,
+  .modal-backdrop,
+  .mobile-drawer,
+  .loading-shell-inner {
+    animation: none !important;
+    transition: none !important;
+  }
 }
