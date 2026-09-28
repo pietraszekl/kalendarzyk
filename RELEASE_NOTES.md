@@ -114,6 +114,7 @@ This release expands Cycle Compass / Kalendarzyk from a simple cycle calendar in
 - Added strict response headers via `next.config.ts` — Content-Security-Policy (default-src self, no third-party scripts/connect/fonts/frames), X-Content-Type-Options, X-Frame-Options DENY, Referrer-Policy no-referrer, Permissions-Policy disabling geolocation/camera/mic/USB/FLoC/Topics and other unused browser features, plus Strict-Transport-Security with preload.
 - Hardened ICS export against calendar-injection: trip names and other text fields are now escaped per RFC 5545 §3.3.11 (`\\`, `;`, `,`, newlines), long lines are folded at 75 characters per RFC 5545 §3.1, and the PRODID + UID domain were neutralised so the exported file does not brand itself to whoever imports it.
 - Storage migration now caps `trips` and `periodEntries` at 1000 each and validates `holidayCountry` against an ISO 3166-1 alpha-2 regex, so a tampered or runaway `localStorage` entry cannot freeze the app on hydration or pass unexpected values to the holidays library.
+- Hardened local storage parsing with real calendar-date validation, semantic cycle/trip/period guards, duplicate period-start cleanup, trip-name trimming, and partial recovery so malformed local records are ignored without dropping valid data.
 - Trip name input is now bounded to 200 characters (validation + `isTrip` migration guard).
 - `persistState` swallows quota / disabled-storage errors instead of crashing the React tree (relevant in Safari private mode and policy-restricted browsers).
 - driver.js renders popover text via `innerHTML`; all tour copy must come from static i18n constants. Added `assertStaticTourText` that throws when raw HTML tags appear in the tour copy, plus a SECURITY comment documenting the invariant for future contributors.
@@ -130,6 +131,8 @@ This release expands Cycle Compass / Kalendarzyk from a simple cycle calendar in
 
 - Storage was migrated to support period history, past months, holiday country settings, and the holiday layer.
 - Added domain and component coverage for period-history migration, holiday generation, trip readiness, marker visibility, exports, and forecast chips.
+- Added a dedicated `src/lib/storage.ts` boundary for `localStorage` load/save/clear/migration orchestration, keeping persistence concerns out of the planner component.
+- Added storage-boundary and tampered-data regression tests for malformed dates, invalid period/trip records, duplicate period starts, legacy migration, persistence, and clearing.
 - Added `driver.js` as a dependency for the onboarding tour (~5 KB, zero transitive dependencies).
 - Onboarding logic is isolated in `src/lib/onboarding.ts` with a structural `OnboardingCopy` interface to keep PL/EN i18n type-safe.
 - Comfort-aware planning lives in `src/lib/cycle-comfort.ts` as pure functions over the existing forecast output. Gentle-mode preference is stored under `kalendarzyk.gentle.v1` and cleared by the `Delete everything` action.

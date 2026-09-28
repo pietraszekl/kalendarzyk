@@ -1,4 +1,5 @@
 export type Locale = "pl" | "en";
+export type DateKey = string;
 export type HorizonMonths = 2 | 4 | 8 | 12;
 export type PastMonths = 0 | 1 | 2 | 3;
 export type CycleLayer = "period" | "fertile" | "ovulation";
@@ -8,7 +9,7 @@ export type VisibleLayers = Record<Layer, boolean>;
 type LegacyVisibleLayers = Record<CycleLayer, boolean>;
 
 export interface CycleInput {
-  lastPeriodStart: string;
+  lastPeriodStart: DateKey;
   cycleLengthDays: number;
   periodLengthDays: number;
 }
@@ -20,15 +21,32 @@ export interface CycleSettings {
 
 export interface PeriodEntry {
   id: string;
-  startDate: string;
+  startDate: DateKey;
   periodLengthDays: number;
 }
 
 export interface Trip {
   id: string;
   name: string;
-  startDate: string;
-  endDate: string;
+  startDate: DateKey;
+  endDate: DateKey;
+}
+
+export interface HealthData {
+  cycleSettings: CycleSettings | null;
+  periodEntries: PeriodEntry[];
+}
+
+export interface PlanningData {
+  trips: Trip[];
+}
+
+export interface UserPreferences {
+  locale: Locale;
+  horizonMonths: HorizonMonths;
+  pastMonths: PastMonths;
+  holidayCountry: string | null;
+  visibleLayers: VisibleLayers;
 }
 
 export interface LegacySettings extends CycleInput {
@@ -58,16 +76,8 @@ export interface LegacyAppStateV3 {
   visibleLayers: Omit<VisibleLayers, "holidays">;
 }
 
-export interface AppState {
+export interface AppState extends HealthData, PlanningData, UserPreferences {
   storageVersion: 4;
-  cycleSettings: CycleSettings | null;
-  periodEntries: PeriodEntry[];
-  trips: Trip[];
-  locale: Locale;
-  horizonMonths: HorizonMonths;
-  pastMonths: PastMonths;
-  holidayCountry: string | null;
-  visibleLayers: VisibleLayers;
 }
 
 export interface CyclePrediction {
@@ -180,7 +190,26 @@ export function defaultAppState(locale: Locale): AppState {
   };
 }
 
+export function isDateKey(value: unknown): value is DateKey {
+  if (typeof value !== "string") return false;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const [, yearText, monthText, dayText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const date = new Date(year, month - 1, day, 12);
+  return (
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+  );
+}
+
 export function parseDateKey(value: string): Date {
+  if (!isDateKey(value)) {
+    throw new Error(`Invalid date key: ${value}`);
+  }
   const [year, month, day] = value.split("-").map(Number);
   return new Date(year, month - 1, day, 12);
 }
@@ -921,9 +950,8 @@ function isCycle(value: unknown): value is CycleInput {
   if (!value || typeof value !== "object") return false;
   const cycle = value as Partial<CycleInput>;
   return (
-    typeof cycle.lastPeriodStart === "string" &&
-    typeof cycle.cycleLengthDays === "number" &&
-    typeof cycle.periodLengthDays === "number"
+    isDateKey(cycle.lastPeriodStart) &&
+    validateCycleInput(cycle as CycleInput, cycle.lastPeriodStart).errors.length === 0
   );
 }
 
@@ -932,29 +960,39 @@ function isCycleSettings(value: unknown): value is CycleSettings {
   const settings = value as Partial<CycleSettings>;
   return (
     typeof settings.cycleLengthDays === "number" &&
-    typeof settings.periodLengthDays === "number"
+    typeof settings.periodLengthDays === "number" &&
+    validateCycleSettings(settings as CycleSettings).errors.length === 0
   );
 }
 
 function isPeriodEntry(value: unknown): value is PeriodEntry {
   if (!value || typeof value !== "object") return false;
   const entry = value as Partial<PeriodEntry>;
+  const periodLengthDays = entry.periodLengthDays;
   return (
     typeof entry.id === "string" &&
-    typeof entry.startDate === "string" &&
-    typeof entry.periodLengthDays === "number"
+    isDateKey(entry.startDate) &&
+    typeof periodLengthDays === "number" &&
+    Number.isInteger(periodLengthDays) &&
+    periodLengthDays >= 1 &&
+    periodLengthDays <= 14
   );
 }
 
 function isTrip(value: unknown): value is Trip {
   if (!value || typeof value !== "object") return false;
   const trip = value as Partial<Trip>;
+  const trimmedName = typeof trip.name === "string" ? trip.name.trim() : "";
+  const startDate = trip.startDate;
+  const endDate = trip.endDate;
   return (
     typeof trip.id === "string" &&
     typeof trip.name === "string" &&
-    trip.name.length <= TRIP_NAME_MAX_LENGTH &&
-    typeof trip.startDate === "string" &&
-    typeof trip.endDate === "string"
+    trimmedName.length > 0 &&
+    trimmedName.length <= TRIP_NAME_MAX_LENGTH &&
+    isDateKey(startDate) &&
+    isDateKey(endDate) &&
+    endDate >= startDate
   );
 }
 
@@ -984,6 +1022,23 @@ function isLayers(
   );
 }
 
+function sanitizePeriodEntries(entries: PeriodEntry[]): PeriodEntry[] {
+  const seenStartDates = new Set<string>();
+  const sanitized: PeriodEntry[] = [];
+  for (const entry of sortPeriodEntries(entries).slice(0, MAX_PERIOD_ENTRIES)) {
+    if (seenStartDates.has(entry.startDate)) continue;
+    seenStartDates.add(entry.startDate);
+    sanitized.push(entry);
+  }
+  return sanitized;
+}
+
+function sanitizeTrips(trips: Trip[]): Trip[] {
+  return trips
+    .slice(0, MAX_TRIPS)
+    .map((trip) => ({ ...trip, name: trip.name.trim() }));
+}
+
 export function migrateStoredState(value: unknown): AppState | null {
   if (!value || typeof value !== "object") return null;
   const current = value as Partial<AppState>;
@@ -991,12 +1046,8 @@ export function migrateStoredState(value: unknown): AppState | null {
   const currentPastMonths = normalizePastMonths(current.pastMonths);
   if (
     current.storageVersion === 4 &&
-    (current.cycleSettings === null ||
-      isCycleSettings(current.cycleSettings)) &&
     Array.isArray(current.periodEntries) &&
-    current.periodEntries.every(isPeriodEntry) &&
     Array.isArray(current.trips) &&
-    current.trips.every(isTrip) &&
     isLocale(current.locale) &&
     currentHorizon !== null &&
     currentPastMonths !== null &&
@@ -1005,15 +1056,16 @@ export function migrateStoredState(value: unknown): AppState | null {
   ) {
     return {
       ...current,
+      cycleSettings: isCycleSettings(current.cycleSettings)
+        ? current.cycleSettings
+        : null,
       horizonMonths: currentHorizon,
       pastMonths: currentPastMonths,
       holidayCountry: current.holidayCountry ?? null,
       // Truncate runaway arrays so a tampered localStorage entry cannot freeze
       // the app on hydration with a million synthetic trips or entries.
-      periodEntries: sortPeriodEntries(
-        current.periodEntries.slice(0, MAX_PERIOD_ENTRIES),
-      ),
-      trips: current.trips.slice(0, MAX_TRIPS),
+      periodEntries: sanitizePeriodEntries(current.periodEntries.filter(isPeriodEntry)),
+      trips: sanitizeTrips(current.trips.filter(isTrip)),
       visibleLayers: current.visibleLayers as VisibleLayers,
     } as AppState;
   }
@@ -1023,12 +1075,8 @@ export function migrateStoredState(value: unknown): AppState | null {
   const previousV3PastMonths = normalizePastMonths(previousV3.pastMonths);
   if (
     previousV3.storageVersion === 3 &&
-    (previousV3.cycleSettings === null ||
-      isCycleSettings(previousV3.cycleSettings)) &&
     Array.isArray(previousV3.periodEntries) &&
-    previousV3.periodEntries.every(isPeriodEntry) &&
     Array.isArray(previousV3.trips) &&
-    previousV3.trips.every(isTrip) &&
     isLocale(previousV3.locale) &&
     previousV3Horizon !== null &&
     previousV3PastMonths !== null &&
@@ -1036,9 +1084,11 @@ export function migrateStoredState(value: unknown): AppState | null {
   ) {
     return {
       storageVersion: 4,
-      cycleSettings: previousV3.cycleSettings,
-      periodEntries: sortPeriodEntries(previousV3.periodEntries),
-      trips: previousV3.trips,
+      cycleSettings: isCycleSettings(previousV3.cycleSettings)
+        ? previousV3.cycleSettings
+        : null,
+      periodEntries: sanitizePeriodEntries(previousV3.periodEntries.filter(isPeriodEntry)),
+      trips: sanitizeTrips(previousV3.trips.filter(isTrip)),
       locale: previousV3.locale,
       horizonMonths: previousV3Horizon,
       pastMonths: previousV3PastMonths,
@@ -1052,33 +1102,32 @@ export function migrateStoredState(value: unknown): AppState | null {
 
   const previous = value as Partial<LegacyAppStateV2>;
   const previousHorizon = normalizeHorizon(previous.horizonMonths);
+  const previousCycle = isCycle(previous.cycle) ? previous.cycle : null;
   if (
     previous.storageVersion === 2 &&
-    (previous.cycle === null || isCycle(previous.cycle)) &&
     Array.isArray(previous.trips) &&
-    previous.trips.every(isTrip) &&
     isLocale(previous.locale) &&
     previousHorizon !== null &&
     isLayers(previous.visibleLayers, true)
   ) {
     return {
       storageVersion: 4,
-      cycleSettings: previous.cycle
+      cycleSettings: previousCycle
         ? {
-            cycleLengthDays: previous.cycle.cycleLengthDays,
-            periodLengthDays: previous.cycle.periodLengthDays,
+            cycleLengthDays: previousCycle.cycleLengthDays,
+            periodLengthDays: previousCycle.periodLengthDays,
           }
         : null,
-      periodEntries: previous.cycle
+      periodEntries: previousCycle
         ? [
             {
-              id: `period-${previous.cycle.lastPeriodStart}`,
-              startDate: previous.cycle.lastPeriodStart,
-              periodLengthDays: previous.cycle.periodLengthDays,
+              id: `period-${previousCycle.lastPeriodStart}`,
+              startDate: previousCycle.lastPeriodStart,
+              periodLengthDays: previousCycle.periodLengthDays,
             },
           ]
         : [],
-      trips: previous.trips,
+      trips: sanitizeTrips(previous.trips.filter(isTrip)),
       locale: previous.locale,
       horizonMonths: previousHorizon,
       pastMonths: 0,

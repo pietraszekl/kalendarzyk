@@ -5,11 +5,13 @@ import {
   effectiveCycleLength,
   generateForecast,
   generateIcsCalendar,
+  isDateKey,
   isTripVisible,
   layoutCalendarBars,
   layersForDate,
   migrateStoredState,
   packCalendarBarLanes,
+  parseDateKey,
   segmentCalendarBar,
   splitTrips,
   tripOverlapLayers,
@@ -122,6 +124,14 @@ describe("cycle forecasting", () => {
 });
 
 describe("cycle validation", () => {
+  it("accepts only real YYYY-MM-DD calendar dates", () => {
+    expect(isDateKey("2026-02-28")).toBe(true);
+    expect(isDateKey("2026-02-31")).toBe(false);
+    expect(isDateKey("2026-2-3")).toBe(false);
+    expect(isDateKey("banana")).toBe(false);
+    expect(() => parseDateKey("2026-99-99")).toThrow("Invalid date key");
+  });
+
   it("rejects future dates and values outside hard limits", () => {
     expect(validateCycleSettings({
       cycleLengthDays: 14,
@@ -277,6 +287,48 @@ describe("trip planning", () => {
       visibleLayers: {
         holidays: true,
       },
+    });
+  });
+
+  it("sanitizes tampered current storage without dropping valid records", () => {
+    const migrated = migrateStoredState({
+      storageVersion: 4,
+      cycleSettings: {
+        cycleLengthDays: 900,
+        periodLengthDays: 5,
+      },
+      periodEntries: [
+        { id: "bad-date", startDate: "2026-02-31", periodLengthDays: 5 },
+        { id: "too-long", startDate: "2026-05-01", periodLengthDays: 99 },
+        { id: "first", startDate: "2026-05-04", periodLengthDays: 5 },
+        { id: "duplicate", startDate: "2026-05-04", periodLengthDays: 4 },
+      ],
+      trips: [
+        { id: "blank", name: "   ", startDate: "2026-06-01", endDate: "2026-06-02" },
+        { id: "backwards", name: "Backwards", startDate: "2026-06-03", endDate: "2026-06-02" },
+        { id: "valid", name: "  Weekend  ", startDate: "2026-06-01", endDate: "2026-06-02" },
+      ],
+      locale: "pl",
+      horizonMonths: 4,
+      pastMonths: 0,
+      holidayCountry: "PL",
+      visibleLayers: {
+        period: true,
+        fertile: true,
+        ovulation: true,
+        trips: true,
+        holidays: true,
+      },
+    });
+
+    expect(migrated).toMatchObject({
+      cycleSettings: null,
+      periodEntries: [
+        { id: "first", startDate: "2026-05-04", periodLengthDays: 5 },
+      ],
+      trips: [
+        { id: "valid", name: "Weekend", startDate: "2026-06-01", endDate: "2026-06-02" },
+      ],
     });
   });
 });

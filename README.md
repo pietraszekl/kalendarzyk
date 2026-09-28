@@ -21,7 +21,7 @@ Cycle Compass is a browser-only travel planner that, if you choose, overlays est
 - Past trips show only their identity (name, dates, overlap icons) — forecast metadata is hidden once a trip has ended.
 - Returning users can replay the onboarding tour from the My cycle tab.
 - A Start-tab teaser previews the comfort-plan feature with a sample energy gradient and a "Plan a trip" CTA when the user has cycle data but no trips yet.
-- Toggle Gentle mode (on by default) to dim suggested intensity during the luteal phase and the first menstrual days and to add rest-oriented hints.
+- Suggested intensity is conservatively dimmed during the luteal phase and the first menstrual days by default.
 - Add actual period starts from up to 3 months back and keep a local period history.
 - Forecast future period, ovulation, and fertile-window dates from saved history or fallback cycle settings.
 - Show a calendar window with configurable past months `0 / 1 / 2 / 3` and future range `2 / 4 / 8 / 12` months.
@@ -38,7 +38,7 @@ Cycle Compass is a browser-only travel planner that, if you choose, overlays est
 
 Cycle predictions are estimates. They are intended for orientation and travel preparation only, not contraception, diagnosis, or medical advice.
 
-All cycle entries, trips, preferences, and holiday settings stay in `localStorage` in the current browser. Exported PNG and `.ics` files may contain private information, so users control where those files are saved or shared. Exports use a neutral `calendar-{date}` filename so the Downloads folder does not advertise the app.
+All cycle entries, trips, preferences, and holiday settings stay in `localStorage` in the current browser. Stored data is validated and sanitized on load so malformed local records are ignored before forecasts or exports are built. Exported PNG and `.ics` files may contain private information, so users control where those files are saved or shared. Exports use a neutral `calendar-{date}` filename so the Downloads folder does not advertise the app.
 
 Defence-in-depth headers shipped with the app:
 - A strict Content-Security-Policy (`default-src 'self'`, no third-party scripts, fetches, fonts, frames or form posts)

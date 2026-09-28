@@ -66,7 +66,6 @@ import {
   addDays,
   addMonths,
   createCalendarWindow,
-  defaultAppState,
   effectiveCycleLength,
   generateForecast,
   generateIcsCalendar,
@@ -75,7 +74,6 @@ import {
   isTripVisible,
   layoutCalendarBars,
   layersForDate,
-  migrateStoredState,
   pastMonthsForDate,
   parseDateKey,
   sortPeriodEntries,
@@ -101,13 +99,18 @@ import {
   markOnboardingComplete,
   startOnboarding,
 } from "@/lib/onboarding";
+import {
+  clearAllStoredAppData,
+  clearLegacyStoredAppState,
+  getStoredLocale,
+  getStoredPanelTab,
+  hasCurrentStoredState,
+  loadAppState,
+  persistAppState,
+  saveStoredLocale,
+  saveStoredPanelTab,
+} from "@/lib/storage";
 
-const STORAGE_KEY = "kalendarzyk.settings.v4";
-const LEGACY_V3_STORAGE_KEY = "kalendarzyk.settings.v3";
-const LEGACY_V2_STORAGE_KEY = "kalendarzyk.settings.v2";
-const LEGACY_STORAGE_KEY = "kalendarzyk.settings.v1";
-const LOCALE_KEY = "kalendarzyk.locale";
-const PANEL_TAB_KEY = "kalendarzyk.panelTab";
 const MOBILE_QUERY = "(max-width: 820px)";
 
 type PanelTab = "summary" | "trips" | "cycle" | "settings";
@@ -294,29 +297,12 @@ const EMPTY_TRIP_FORM: TripFormValues = {
   endDate: "",
 };
 
-function isLocale(value: unknown): value is Locale {
-  return value === "pl" || value === "en";
-}
-
 function isPanelTab(value: unknown): value is PanelTab {
   return value === "summary" || value === "trips" || value === "cycle" || value === "settings";
 }
 
 function detectLocale(): Locale {
   return navigator.language.toLowerCase().startsWith("pl") ? "pl" : "en";
-}
-
-function persistState(state: AppState): boolean {
-  // `setItem` throws when the browser quota is exceeded (e.g. Safari private
-  // mode has a 0-byte quota) or when localStorage is disabled by policy.
-  // We swallow the error rather than crashing the React tree — the next save
-  // attempt will try again, and the in-memory state is still accurate.
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function createTripId() {
@@ -1091,35 +1077,9 @@ export default function CyclePlanner() {
   );
 
   useEffect(() => {
-    const preferred = localStorage.getItem(LOCALE_KEY);
-    const fallbackLocale = isLocale(preferred) ? preferred : detectLocale();
-    let restored: AppState | null = null;
-    let usedLegacyState = false;
-    try {
-      const current = localStorage.getItem(STORAGE_KEY);
-      const legacyV3 = localStorage.getItem(LEGACY_V3_STORAGE_KEY);
-      const legacyV2 = localStorage.getItem(LEGACY_V2_STORAGE_KEY);
-      const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
-      restored = migrateStoredState(
-        current
-          ? JSON.parse(current)
-          : legacyV3
-            ? JSON.parse(legacyV3)
-          : legacyV2
-            ? JSON.parse(legacyV2)
-            : legacy
-              ? JSON.parse(legacy)
-              : null,
-      );
-      usedLegacyState = !current && (!!legacyV3 || !!legacyV2 || !!legacy) && !!restored;
-    } catch {
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem(LEGACY_V3_STORAGE_KEY);
-      localStorage.removeItem(LEGACY_V2_STORAGE_KEY);
-      localStorage.removeItem(LEGACY_STORAGE_KEY);
-    }
-    const initialState = restored ?? defaultAppState(fallbackLocale);
-    const savedPanelTab = localStorage.getItem(PANEL_TAB_KEY);
+    const fallbackLocale = getStoredLocale() ?? detectLocale();
+    const { state: initialState, usedLegacyState } = loadAppState(fallbackLocale);
+    const savedPanelTab = getStoredPanelTab();
     // Browser-only preferences are available only after hydration.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setApp(initialState);
@@ -1131,10 +1091,8 @@ export default function CyclePlanner() {
       });
     }
     if (usedLegacyState) {
-      persistState(initialState);
-      localStorage.removeItem(LEGACY_V3_STORAGE_KEY);
-      localStorage.removeItem(LEGACY_V2_STORAGE_KEY);
-      localStorage.removeItem(LEGACY_STORAGE_KEY);
+      persistAppState(initialState);
+      clearLegacyStoredAppState();
     }
     setReady(true);
   }, []);
@@ -1164,7 +1122,7 @@ export default function CyclePlanner() {
     if (onboardingStartedRef.current) return;
     if (hasCompletedOnboarding()) return;
     // Skip if the user already has saved cycle data (returning user without flag).
-    if (localStorage.getItem(STORAGE_KEY)) {
+    if (hasCurrentStoredState()) {
       markOnboardingComplete();
       return;
     }
@@ -1258,19 +1216,19 @@ export default function CyclePlanner() {
     setApp((previous) => {
       if (!previous) return previous;
       const next = updater(previous);
-      persistState(next);
+      persistAppState(next);
       return next;
     });
   }
 
   function changeLocale(nextLocale: Locale) {
-    localStorage.setItem(LOCALE_KEY, nextLocale);
+    saveStoredLocale(nextLocale);
     updateApp((previous) => ({ ...previous, locale: nextLocale }));
   }
 
   function selectPanelTab(tab: PanelTab) {
     setPanelTab(tab);
-    localStorage.setItem(PANEL_TAB_KEY, tab);
+    saveStoredPanelTab(tab);
   }
 
   function openDrawer(tab?: PanelTab) {
@@ -1488,14 +1446,8 @@ export default function CyclePlanner() {
   }
 
   function clearEverything() {
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(LEGACY_V3_STORAGE_KEY);
-    localStorage.removeItem(LEGACY_V2_STORAGE_KEY);
-    localStorage.removeItem(LEGACY_STORAGE_KEY);
-    localStorage.removeItem(LOCALE_KEY);
-    localStorage.removeItem(PANEL_TAB_KEY);
-    localStorage.removeItem(ONBOARDING_KEY);
-    const reset = defaultAppState(detectLocale());
+    clearAllStoredAppData([ONBOARDING_KEY]);
+    const reset = loadAppState(detectLocale()).state;
     setApp(reset);
     setCycleForm(EMPTY_CYCLE_FORM);
     setPeriodForm(EMPTY_PERIOD_FORM);
