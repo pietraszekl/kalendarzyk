@@ -23,6 +23,11 @@ This release expands Cycle Compass / Kalendarzyk from a simple cycle calendar in
 - Moved supporting controls and explanatory content into a tabbed sidebar/drawer: `Summary`, `Trips`, and `Cycle`.
 - Kept the calendar as the primary view, with compact forecast chips in the calendar header for next period, estimated ovulation, and fertile window.
 - Updated selected marker controls and forecast chips to use tonal text colors that match their soft backgrounds.
+- Added a quick-action block above the sidebar tabs so users can start with `Add period` or `Plan a trip` before opening deeper settings.
+- Renamed the management structure to task-led labels: `Start`, `Plans`, and `My cycle` / `Start`, `Plany`, `Mój cykl`.
+- Added a mobile bottom navigation with `Calendar`, `Add`, and `Plans`, plus a quick-add sheet for choosing between period entry and trip planning.
+- Simplified settings copy from administrative labels such as visible markers and forecast range to task language like "What to show in calendar" and "Months to show".
+- Added a dedicated `Settings` / `Ustawienia` tab for calendar range, visible layers, holidays, export, and data deletion so `Start` can stay focused on orientation.
 
 ### Onboarding
 
@@ -32,10 +37,14 @@ This release expands Cycle Compass / Kalendarzyk from a simple cycle calendar in
 - The spotlight overlay dims the rest of the screen and highlights the active element. Users can click highlighted elements or use Next/Back/Skip buttons.
 - Completing or skipping the tour saves a flag so it never shows again. The flag is cleared when all app data is reset.
 - All tour strings are available in Polish and English.
+- Updated the tour's mobile entry point to highlight the new bottom `Add` button instead of the old manage button.
+- Shortened the first-run tour from eight instructional steps to three orientation steps: welcome, quick add, and completion.
 
 ### Summary Tab UX
 
 - When no cycle data has been entered, the Summary tab now shows a prominent prompt at the top directing the user to add cycle details, with a direct link to the Cycle tab.
+- Reframed the Summary tab as `Start`, keeping orientation and display settings separate from the faster add-period/add-trip entry points.
+- Added real quick-add forms for period entry and trip planning so the primary add flows no longer require opening the full `My cycle` or `Plans` tabs first.
 
 ### Comfort-Aware Trip Planning
 
@@ -96,6 +105,7 @@ This release expands Cycle Compass / Kalendarzyk from a simple cycle calendar in
 - Calendar days use high cells with icon-based range bars and overflow indicators.
 - Month grids use compact 5- or 6-week layouts with blank placeholders rather than adjacent-month date numbers.
 - Mobile users can tap a day to see full event details, including hidden overflow events.
+- Mobile day details now include direct actions to add a period on that day or start a trip from that day when the selected date allows it.
 - PNG export captures the simplified calendar view without sidebar controls.
 - `.ics` export respects the current visible range and enabled marker layers.
 

@@ -15,11 +15,12 @@ Cycle Compass is a browser-only travel planner that, if you choose, overlays est
 ## Features
 
 - First-time users are guided through an interactive onboarding tour (spotlight overlay with step-by-step popovers) that walks through cycle settings, period entry, and trip planning.
+- Quick actions keep the common flows visible: add a period or plan a trip from short forms in the desktop sidebar or mobile `Calendar / Add / Plans` bottom navigation.
 - Each trip card is organised as four stacked sections — header (trip name + date with inline overlap icons), vibe (small "Suggested activity" eyebrow above a prominent vibe headline), gradient energy strip with weekday/day labels, and a quiet confidence footer with a 3-step signal bar. Sentence case, sage-tinted background, fully-rounded gradient pill.
 - Calendar day cells that overlap a trip show a small battery icon whose fill (`Battery` / `BatteryLow` / `BatteryMedium` / `BatteryFull` / `BatteryCharging`) and colour both reflect the day's energy level.
 - Past trips show only their identity (name, dates, overlap icons) — forecast metadata is hidden once a trip has ended.
-- Returning users can replay the onboarding tour from the Cycle tab.
-- A Summary-tab teaser previews the comfort-plan feature with a sample energy gradient and a "Plan a trip" CTA when the user has cycle data but no trips yet.
+- Returning users can replay the onboarding tour from the My cycle tab.
+- A Start-tab teaser previews the comfort-plan feature with a sample energy gradient and a "Plan a trip" CTA when the user has cycle data but no trips yet.
 - Toggle Gentle mode (on by default) to dim suggested intensity during the luteal phase and the first menstrual days and to add rest-oriented hints.
 - Add actual period starts from up to 3 months back and keep a local period history.
 - Forecast future period, ovulation, and fertile-window dates from saved history or fallback cycle settings.
@@ -27,6 +28,7 @@ Cycle Compass is a browser-only travel planner that, if you choose, overlays est
 - Add, edit, and delete trips, including trips that work before any cycle data is entered.
 - See trip readiness context: cycle overlaps, public holidays during the trip, forecast confidence, and practical preparation prompts.
 - Display cycle phases, trips, and holidays as accessible calendar bars with icons, colors, labels, and mobile day details.
+- Mobile day details can start a period entry or trip plan from the selected date.
 - Toggle visible markers for period, fertile window, ovulation, trips, and holidays.
 - Select country-level public/bank holidays offline via `date-holidays`; regional holiday differences are noted in the UI.
 - Export the visible calendar to PNG or `.ics` while respecting the selected date range and enabled layers.

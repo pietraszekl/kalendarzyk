@@ -31,6 +31,7 @@ import {
   LockKeyhole,
   Pencil,
   Plane,
+  Plus,
   Settings2,
   Sparkles,
   Trash2,
@@ -109,7 +110,8 @@ const LOCALE_KEY = "kalendarzyk.locale";
 const PANEL_TAB_KEY = "kalendarzyk.panelTab";
 const MOBILE_QUERY = "(max-width: 820px)";
 
-type PanelTab = "summary" | "trips" | "cycle";
+type PanelTab = "summary" | "trips" | "cycle" | "settings";
+type QuickAddMode = "menu" | "period" | "trip";
 
 interface CycleFormValues {
   cycleLengthDays: string;
@@ -297,7 +299,7 @@ function isLocale(value: unknown): value is Locale {
 }
 
 function isPanelTab(value: unknown): value is PanelTab {
-  return value === "summary" || value === "trips" || value === "cycle";
+  return value === "summary" || value === "trips" || value === "cycle" || value === "settings";
 }
 
 function detectLocale(): Locale {
@@ -508,6 +510,8 @@ function CalendarMonth({
   isMobile,
   selectedDate,
   onSelectDate,
+  onAddPeriod,
+  onAddTrip,
   cycleLength,
 }: {
   month: string;
@@ -520,6 +524,8 @@ function CalendarMonth({
   isMobile: boolean;
   selectedDate: string | null;
   onSelectDate: (date: string) => void;
+  onAddPeriod: (date: string) => void;
+  onAddTrip: (date: string) => void;
   cycleLength: number | null;
 }) {
   const t = copy[locale];
@@ -737,17 +743,35 @@ function CalendarMonth({
           </div>
         ))}
       </div>
-      {isMobile && selectedDate && selectedEvents.length > 0 && (
+      {isMobile && selectedDate && selectedDate >= month && selectedDate <= monthEnd && (
         <section className="day-details" aria-label={t.selectedDay}>
           <strong>{formatDate(selectedDate, locale)}</strong>
-          <ul>
-            {selectedEvents.map((event) => (
-              <li className={`detail-${event.layer}`} key={event.id}>
-                <LayerIcon layer={event.layer} size={14} />
-                {event.layer === "trips" || event.layer === "holidays" ? event.label : layerName(locale, event.layer)}
-              </li>
-            ))}
-          </ul>
+          {selectedEvents.length > 0 ? (
+            <ul>
+              {selectedEvents.map((event) => (
+                <li className={`detail-${event.layer}`} key={event.id}>
+                  <LayerIcon layer={event.layer} size={14} />
+                  {event.layer === "trips" || event.layer === "holidays" ? event.label : layerName(locale, event.layer)}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>{t.selectedDayNoEvents}</p>
+          )}
+          <div className="day-detail-actions">
+            {selectedDate <= today && (
+              <button onClick={() => onAddPeriod(selectedDate)} type="button">
+                <Droplets size={14} />
+                {t.addPeriodForDay}
+              </button>
+            )}
+            {selectedDate >= today && (
+              <button onClick={() => onAddTrip(selectedDate)} type="button">
+                <Plane size={14} />
+                {t.planTripFromDay}
+              </button>
+            )}
+          </div>
         </section>
       )}
     </section>
@@ -1052,6 +1076,7 @@ export default function CyclePlanner() {
   const [exportError, setExportError] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [quickAddMode, setQuickAddMode] = useState<QuickAddMode | null>(null);
   const [panelTab, setPanelTab] = useState<PanelTab>("summary");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
@@ -1254,6 +1279,42 @@ export default function CyclePlanner() {
     setDrawerOpen(true);
   }
 
+  function startAddPeriod() {
+    setEditingPeriodId(null);
+    setPeriodForm(EMPTY_PERIOD_FORM);
+    setCycleErrors([]);
+    setPeriodErrors([]);
+    setQuickAddMode("period");
+  }
+
+  function startAddTrip() {
+    setEditingTripId(null);
+    setTripForm(EMPTY_TRIP_FORM);
+    setTripErrors([]);
+    setQuickAddMode("trip");
+  }
+
+  function startAddPeriodOnDate(date: string) {
+    setEditingPeriodId(null);
+    setPeriodForm({ ...EMPTY_PERIOD_FORM, startDate: date });
+    setCycleErrors([]);
+    setPeriodErrors([]);
+    setQuickAddMode("period");
+  }
+
+  function startAddTripOnDate(date: string) {
+    setEditingTripId(null);
+    setTripForm({ ...EMPTY_TRIP_FORM, startDate: date, endDate: date });
+    setTripErrors([]);
+    setQuickAddMode("trip");
+  }
+
+  function showCalendar() {
+    setDrawerOpen(false);
+    setQuickAddMode(null);
+    document.querySelector(".results")?.scrollIntoView({ block: "start" });
+  }
+
   function submitCycle(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const settings: CycleSettings = {
@@ -1316,6 +1377,7 @@ export default function CyclePlanner() {
     setEditingPeriodId(null);
     setCycleErrors([]);
     setPeriodErrors([]);
+    setQuickAddMode(null);
     if (isMobile) setDrawerOpen(false);
   }
 
@@ -1339,6 +1401,7 @@ export default function CyclePlanner() {
     setTripForm(EMPTY_TRIP_FORM);
     setEditingTripId(null);
     setTripErrors([]);
+    setQuickAddMode(null);
     if (isMobile) setDrawerOpen(false);
   }
 
@@ -1541,6 +1604,9 @@ export default function CyclePlanner() {
   const nextPeriod = forecast?.upcoming[0] ?? null;
   const nextOvulation = forecast ? nextEvent(forecast, today, "ovulation") : null;
   const nextFertile = forecast ? nextEvent(forecast, today, "fertile") : null;
+  const quickPeriodMinDate = addMonths(today, -3);
+  const quickPeriodLengthValue =
+    periodForm.periodLengthDays || cycleForm.periodLengthDays;
 
   function renderCyclePanel() {
     const minPeriodDate = addMonths(today, -3);
@@ -1744,30 +1810,7 @@ export default function CyclePlanner() {
     );
   }
 
-  function goToCycle() {
-    if (isMobile) openDrawer("cycle");
-    else selectPanelTab("cycle");
-  }
-
-  function goToTrips() {
-    if (isMobile) openDrawer("trips");
-    else selectPanelTab("trips");
-  }
-
   function renderSummaryPanel() {
-    const current = app!;
-    const horizonLabels: Record<HorizonMonths, string> = {
-      2: t.months2,
-      4: t.months4,
-      8: t.months8,
-      12: t.months12,
-    };
-    const pastLabels: Record<PastMonths, string> = {
-      0: t.pastMonths0,
-      1: t.pastMonths1,
-      2: t.pastMonths2,
-      3: t.pastMonths3,
-    };
     return (
       <section className="summary-panel">
         <div className="summary-intro">
@@ -1783,15 +1826,39 @@ export default function CyclePlanner() {
             <div>
               <strong>{t.noCycleTitle}</strong>
               <p>{t.noCycleText}</p>
-              <button className="cycle-action" onClick={goToCycle} type="button">
-                {t.addCycleDetails}
+              <button className="cycle-action" onClick={startAddPeriod} type="button">
+                {t.addPeriod}
               </button>
             </div>
           </div>
         )}
         {forecast && categorizedTrips.planned.length === 0 && (
-          <ComfortTeaser locale={locale} onCta={goToTrips} />
+          <ComfortTeaser locale={locale} onCta={startAddTrip} />
         )}
+      </section>
+    );
+  }
+
+  function renderSettingsPanel() {
+    const current = app!;
+    const horizonLabels: Record<HorizonMonths, string> = {
+      2: t.months2,
+      4: t.months4,
+      8: t.months8,
+      12: t.months12,
+    };
+    const pastLabels: Record<PastMonths, string> = {
+      0: t.pastMonths0,
+      1: t.pastMonths1,
+      2: t.pastMonths2,
+      3: t.pastMonths3,
+    };
+    return (
+      <section className="summary-panel settings-view">
+        <div className="section-heading">
+          <h2>{t.manageSettingsTab}</h2>
+          <p>{t.settingsIntro}</p>
+        </div>
         <fieldset>
           <legend>{t.showMonths}</legend>
           <div className="segmented horizon-picker">
@@ -1863,11 +1930,39 @@ export default function CyclePlanner() {
     );
   }
 
+  function renderQuickActions() {
+    return (
+      <section className="quick-actions" aria-label={t.quickActionsTitle}>
+        <div>
+          <h2>{t.quickActionsTitle}</h2>
+          <p>{t.quickActionsIntro}</p>
+        </div>
+        <div className="quick-action-buttons">
+          <button className="quick-action primary" onClick={startAddPeriod} type="button">
+            <Droplets size={18} />
+            <span>
+              <strong>{t.quickAddPeriodTitle}</strong>
+              <small>{t.quickAddPeriodText}</small>
+            </span>
+          </button>
+          <button className="quick-action" onClick={startAddTrip} type="button">
+            <Plane size={18} />
+            <span>
+              <strong>{t.quickAddTripTitle}</strong>
+              <small>{t.quickAddTripText}</small>
+            </span>
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   function renderPanelTabs(prefix: string) {
     const labels: Record<PanelTab, string> = {
       summary: t.manageSummaryTab,
       trips: t.manageTripsTab,
       cycle: t.manageCycleTab,
+      settings: t.manageSettingsTab,
     };
     return (
       <div aria-label={t.managePanelTitle} className="panel-tabs" role="tablist">
@@ -1886,6 +1981,7 @@ export default function CyclePlanner() {
         {panelTab === "summary" && renderSummaryPanel()}
         {panelTab === "trips" && renderTripPanel()}
         {panelTab === "cycle" && renderCyclePanel()}
+        {panelTab === "settings" && renderSettingsPanel()}
       </div>
     );
   }
@@ -1923,6 +2019,7 @@ export default function CyclePlanner() {
       <div className="workspace">
         {!isMobile && (
           <aside className="sidebar-panel desktop-sidebar">
+            {renderQuickActions()}
             {renderPanelTabs("desktop")}
             {renderPanelContent("desktop")}
           </aside>
@@ -1936,13 +2033,13 @@ export default function CyclePlanner() {
               nextOvulation={nextOvulation}
               nextPeriod={forecast ? nextPeriod : null}
             />
-            <button className="mobile-manage-button" onClick={() => openDrawer()} type="button" aria-label={t.managePlans}><Settings2 size={18} /><span>{t.managePlans}</span></button>
+            <button className="mobile-manage-button" onClick={() => openDrawer("summary")} type="button" aria-label={t.managePlans}><Settings2 size={18} /><span>{t.managePlans}</span></button>
           </div>
           <div className="forecast-report" ref={reportRef}>
             <div aria-hidden="true" className="capture-header"><h2>{t.calendar}</h2></div>
             <div className="months">
               {calendarWindow.months.map((month) => (
-                <CalendarMonth key={month} month={month} predictions={predictions} trips={app.trips} holidays={holidayEvents} layers={app.visibleLayers} locale={locale} today={today} isMobile={isMobile} selectedDate={selectedDate} onSelectDate={(date) => setSelectedDate((selected) => selected === date ? null : date)} cycleLength={currentCycleLength} />
+                <CalendarMonth key={month} month={month} predictions={predictions} trips={app.trips} holidays={holidayEvents} layers={app.visibleLayers} locale={locale} today={today} isMobile={isMobile} selectedDate={selectedDate} onSelectDate={(date) => setSelectedDate((selected) => selected === date ? null : date)} onAddPeriod={startAddPeriodOnDate} onAddTrip={startAddTripOnDate} cycleLength={currentCycleLength} />
               ))}
             </div>
             <Legend locale={locale} layers={app.visibleLayers} hasCycle={hasCycleData} hasHolidays={!!app.holidayCountry} />
@@ -1967,6 +2064,133 @@ export default function CyclePlanner() {
             </header>
             {renderPanelTabs("drawer")}
             {renderPanelContent("drawer")}
+          </section>
+        </div>
+      )}
+      {isMobile && (
+        <nav className="mobile-bottom-nav" aria-label={t.managePanelTitle}>
+          <button onClick={showCalendar} type="button">
+            <CalendarDays size={18} />
+            <span>{t.mobileCalendarNav}</span>
+          </button>
+          <button className="mobile-bottom-add" onClick={() => setQuickAddMode("menu")} type="button">
+            <Plus size={20} />
+            <span>{t.mobileAddNav}</span>
+          </button>
+          <button onClick={() => openDrawer("trips")} type="button">
+            <Plane size={18} />
+            <span>{t.mobilePlansNav}</span>
+          </button>
+        </nav>
+      )}
+      {quickAddMode && (
+        <div className="modal-backdrop quick-add-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setQuickAddMode(null); }}>
+          <section aria-labelledby="quick-add-title" aria-modal="true" className="modal quick-add-sheet" role="dialog">
+            <header className="quick-add-header">
+              <div>
+                <h2 id="quick-add-title">
+                  {quickAddMode === "period"
+                    ? t.quickAddPeriodTitle
+                    : quickAddMode === "trip"
+                      ? t.quickAddTripTitle
+                      : t.quickActionsTitle}
+                </h2>
+                <p>
+                  {quickAddMode === "period"
+                    ? t.quickAddPeriodText
+                    : quickAddMode === "trip"
+                      ? t.quickAddTripText
+                      : t.quickActionsIntro}
+                </p>
+              </div>
+              <button aria-label={t.closePanel} onClick={() => setQuickAddMode(null)} type="button">
+                <X size={18} />
+              </button>
+            </header>
+            {quickAddMode === "menu" && (
+              <div className="quick-add-options">
+                <button className="quick-action primary" onClick={startAddPeriod} type="button">
+                  <Droplets size={18} />
+                  <span>
+                    <strong>{t.quickAddPeriodTitle}</strong>
+                    <small>{t.quickAddPeriodText}</small>
+                  </span>
+                </button>
+                <button className="quick-action" onClick={startAddTrip} type="button">
+                  <Plane size={18} />
+                  <span>
+                    <strong>{t.quickAddTripTitle}</strong>
+                    <small>{t.quickAddTripText}</small>
+                  </span>
+                </button>
+              </div>
+            )}
+            {quickAddMode === "period" && (
+              <form className="quick-add-form" onSubmit={submitPeriod} noValidate>
+                <label>
+                  {t.periodStart}
+                  <input
+                    type="date"
+                    min={quickPeriodMinDate}
+                    max={today}
+                    value={periodForm.startDate}
+                    onChange={(event) => setPeriodForm({ ...periodForm, startDate: event.target.value })}
+                  />
+                </label>
+                <label>
+                  {t.entryPeriodLength}
+                  <span className="number-field">
+                    <input
+                      type="number"
+                      min={1}
+                      max={14}
+                      value={quickPeriodLengthValue}
+                      onChange={(event) => setPeriodForm({ ...periodForm, periodLengthDays: event.target.value })}
+                    />
+                    <small>{t.days}</small>
+                  </span>
+                </label>
+                {(cycleErrors.length > 0 || periodErrors.length > 0) && (
+                  <div className="form-errors" role="alert">
+                    {[...cycleErrors, ...periodErrors].map((error) => <p key={error}>{t.validation[error as keyof typeof t.validation]}</p>)}
+                  </div>
+                )}
+                <button className="primary-button" type="submit">{t.addPeriod}</button>
+              </form>
+            )}
+            {quickAddMode === "trip" && (
+              <form className="quick-add-form" onSubmit={submitTrip} noValidate>
+                <label>
+                  {t.tripName}
+                  <input placeholder={t.tripNamePlaceholder} value={tripForm.name} onChange={(event) => setTripForm({ ...tripForm, name: event.target.value })} />
+                </label>
+                <div className="trip-date-inputs">
+                  <label>
+                    {t.tripStart}
+                    <input
+                      type="date"
+                      min={today}
+                      value={tripForm.startDate}
+                      onChange={(event) => {
+                        const startDate = event.target.value;
+                        setTripForm({ ...tripForm, startDate });
+                        if (startDate) tripEndRef.current?.focus();
+                      }}
+                    />
+                  </label>
+                  <label>
+                    {t.tripEnd}
+                    <input ref={tripEndRef} type="date" min={tripForm.startDate || today} value={tripForm.endDate} onChange={(event) => setTripForm({ ...tripForm, endDate: event.target.value })} />
+                  </label>
+                </div>
+                {tripErrors.length > 0 && (
+                  <div className="form-errors" role="alert">
+                    {tripErrors.map((error) => <p key={error}>{t.validation[error as keyof typeof t.validation]}</p>)}
+                  </div>
+                )}
+                <button className="primary-button" type="submit">{t.addTrip}</button>
+              </form>
+            )}
           </section>
         </div>
       )}

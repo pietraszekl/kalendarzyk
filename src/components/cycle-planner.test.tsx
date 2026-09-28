@@ -48,12 +48,12 @@ function today(offset = 0) {
   return addDays(toDateKey(new Date()), offset);
 }
 
-function chooseTab(name: "Podsumowanie" | "Wyjazdy" | "Cykl") {
+function chooseTab(name: "Start" | "Plany" | "Mój cykl" | "Ustawienia" | "Settings") {
   fireEvent.click(screen.getByRole("tab", { name }));
 }
 
 function addTrip(name = "Urlop", startOffset = 5, endOffset = 7) {
-  if (!screen.queryByLabelText("Nazwa wyjazdu")) chooseTab("Wyjazdy");
+  if (!screen.queryByLabelText("Nazwa wyjazdu")) chooseTab("Plany");
   fireEvent.change(screen.getByLabelText("Nazwa wyjazdu"), {
     target: { value: name },
   });
@@ -67,7 +67,7 @@ function addTrip(name = "Urlop", startOffset = 5, endOffset = 7) {
 }
 
 function addCycle() {
-  chooseTab("Cykl");
+  chooseTab("Mój cykl");
   fireEvent.change(screen.getByLabelText("Pierwszy dzień miesiączki"), {
     target: { value: today(-23) },
   });
@@ -78,18 +78,18 @@ describe("CyclePlanner", () => {
   it("places information in a tabbed sidebar and keeps the calendar compact", async () => {
     vi.setSystemTime(new Date(2026, 4, 27, 12));
     const { container } = render(<CyclePlanner />);
-    expect(await screen.findByRole("tab", { name: "Podsumowanie" })).toHaveAttribute(
+    expect(await screen.findByRole("tab", { name: "Start" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
-    expect(screen.getByText("Dodaj cykl, żeby zobaczyć więcej")).toBeInTheDocument();
+    expect(screen.getByText("Dodaj miesiączkę, żeby zobaczyć więcej")).toBeInTheDocument();
     expect(
       screen.getByText(/Bez kont, bez chmury — tylko Ty i ta przeglądarka/),
     ).toBeInTheDocument();
     expect(container.querySelector(".cycle-compass-logo")).toBeInTheDocument();
     expect(container.querySelector(".brand-mark svg")).toHaveAttribute("aria-hidden", "true");
     expect(container.querySelector(".forecast-report")).not.toHaveTextContent(
-      "Zakres prognozy",
+      "Ile miesięcy pokazać",
     );
     expect(screen.getByRole("heading", { name: "Kalendarz" })).toBeInTheDocument();
     expect(container.querySelector(".month-card .day")).toBeInTheDocument();
@@ -107,8 +107,8 @@ describe("CyclePlanner", () => {
     const { container } = render(<CyclePlanner />);
     const nextMonth = addMonths(startOfMonth(today()), 1);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Zarządzaj planami" }));
-    chooseTab("Wyjazdy");
+    fireEvent.click(await screen.findByRole("button", { name: "Ustawienia" }));
+    chooseTab("Plany");
     fireEvent.change(screen.getByLabelText("Nazwa wyjazdu"), {
       target: { value: "Pierwszy dzień miesiąca" },
     });
@@ -138,8 +138,9 @@ describe("CyclePlanner", () => {
   it("keeps dates and events in a month that requires its sixth week", async () => {
     vi.setSystemTime(new Date(2026, 2, 10, 12));
     const { container } = render(<CyclePlanner />);
-    await screen.findByRole("tab", { name: "Podsumowanie" });
-    chooseTab("Wyjazdy");
+    await screen.findByRole("tab", { name: "Start" });
+    chooseTab("Ustawienia");
+    chooseTab("Plany");
     fireEvent.change(screen.getByLabelText("Nazwa wyjazdu"), {
       target: { value: "Koniec marca" },
     });
@@ -161,7 +162,8 @@ describe("CyclePlanner", () => {
 
   it("switches between 2, 4, 8 and 12 months and stores the selected horizon", async () => {
     const { container } = render(<CyclePlanner />);
-    await screen.findByRole("tab", { name: "Podsumowanie" });
+    await screen.findByRole("tab", { name: "Start" });
+    chooseTab("Ustawienia");
 
     for (const [label, expected] of [
       ["2 miesiące", 2],
@@ -184,7 +186,8 @@ describe("CyclePlanner", () => {
   it("selects a holiday country and shows holidays as a removable calendar layer", async () => {
     vi.setSystemTime(new Date(2026, 0, 1, 12));
     const { container } = render(<CyclePlanner />);
-    await screen.findByRole("tab", { name: "Podsumowanie" });
+    await screen.findByRole("tab", { name: "Start" });
+    chooseTab("Ustawienia");
 
     expect(screen.getByText(/Daty regionalne mogą się różnić/)).toBeInTheDocument();
     expect(screen.getByLabelText("Kraj świąt")).toHaveValue("PL");
@@ -203,12 +206,12 @@ describe("CyclePlanner", () => {
 
   it("stores and restores the chosen panel tab separately from private data", async () => {
     const { unmount } = render(<CyclePlanner />);
-    await screen.findByRole("tab", { name: "Podsumowanie" });
-    chooseTab("Wyjazdy");
+    await screen.findByRole("tab", { name: "Start" });
+    chooseTab("Plany");
     expect(localStorage.getItem(panelTabKey)).toBe("trips");
     unmount();
     render(<CyclePlanner />);
-    expect(await screen.findByRole("tab", { name: "Wyjazdy" })).toHaveAttribute(
+    expect(await screen.findByRole("tab", { name: "Plany" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
@@ -216,11 +219,11 @@ describe("CyclePlanner", () => {
 
   it("renders icon bars for forecast and trips and hides toggled layers", async () => {
     const { container } = render(<CyclePlanner />);
-    await screen.findByRole("tab", { name: "Cykl" });
+    await screen.findByRole("tab", { name: "Mój cykl" });
     addCycle();
-    chooseTab("Wyjazdy");
+    chooseTab("Plany");
     addTrip("Wyjazd na okres");
-    chooseTab("Podsumowanie");
+    chooseTab("Start");
 
     expect(container.querySelector(".calendar-bar.bar-period")).toHaveTextContent("Miesiączka");
     expect(container.querySelector(".calendar-bar.bar-fertile")).toHaveTextContent("Płodne");
@@ -233,6 +236,7 @@ describe("CyclePlanner", () => {
     expect(toolbar.getByLabelText(/Następna miesiączka:/)).toHaveClass("forecast-chip");
     expect(toolbar.getByLabelText(/Szacowana owulacja:/)).toHaveClass("forecast-chip");
     expect(toolbar.getByLabelText(/Okno płodne:/)).toHaveClass("forecast-chip");
+    chooseTab("Ustawienia");
     fireEvent.click(screen.getByLabelText("Miesiączka"));
     expect(container.querySelector(".calendar-bar.bar-period")).not.toBeInTheDocument();
     expect(screen.getByText("Następna miesiączka")).toBeInTheDocument();
@@ -240,7 +244,7 @@ describe("CyclePlanner", () => {
 
   it("localizes forecast chips in the calendar toolbar and hides them without cycle data", async () => {
     const { container } = render(<CyclePlanner />);
-    await screen.findByRole("tab", { name: "Podsumowanie" });
+    await screen.findByRole("tab", { name: "Start" });
     expect(container.querySelector(".forecast-chips")).not.toBeInTheDocument();
 
     addCycle();
@@ -263,8 +267,8 @@ describe("CyclePlanner", () => {
   it("adds, edits and removes saved periods while revealing past months", async () => {
     vi.setSystemTime(new Date(2026, 4, 27, 12));
     const { container } = render(<CyclePlanner />);
-    await screen.findByRole("tab", { name: "Cykl" });
-    chooseTab("Cykl");
+    await screen.findByRole("tab", { name: "Mój cykl" });
+    chooseTab("Mój cykl");
 
     fireEvent.change(screen.getByLabelText("Pierwszy dzień miesiączki"), {
       target: { value: "2026-03-10" },
@@ -293,8 +297,8 @@ describe("CyclePlanner", () => {
 
   it("moves focus from trip start to end when adding and editing", async () => {
     render(<CyclePlanner />);
-    await screen.findByRole("tab", { name: "Wyjazdy" });
-    chooseTab("Wyjazdy");
+    await screen.findByRole("tab", { name: "Plany" });
+    chooseTab("Plany");
     const end = screen.getByLabelText("Do");
     fireEvent.change(end, { target: { value: today(9) } });
     fireEvent.change(screen.getByLabelText("Od"), { target: { value: today(5) } });
@@ -311,11 +315,11 @@ describe("CyclePlanner", () => {
   it("uses the three-tab mobile drawer and reveals full day details after tapping a bar day", async () => {
     setMobileViewport(true);
     const { container } = render(<CyclePlanner />);
-    expect(await screen.findByRole("button", { name: "Zarządzaj planami" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Ustawienia" })).toBeInTheDocument();
     expect(screen.queryByLabelText("Nazwa wyjazdu")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Zarządzaj planami" }));
-    expect(screen.getByRole("tab", { name: "Podsumowanie" })).toBeInTheDocument();
-    chooseTab("Wyjazdy");
+    fireEvent.click(screen.getByRole("button", { name: "Ustawienia" }));
+    expect(screen.getByRole("tab", { name: "Start" })).toBeInTheDocument();
+    chooseTab("Plany");
     addTrip("Mobilny wyjazd");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(container.querySelector(".calendar-bar.bar-trips")).toBeInTheDocument();
@@ -325,17 +329,38 @@ describe("CyclePlanner", () => {
     expect(screen.getByLabelText("Szczegóły dnia")).toHaveTextContent("Mobilny wyjazd");
   });
 
+  it("uses quick-add sheets and selected-day actions on mobile", async () => {
+    vi.setSystemTime(new Date(2026, 8, 28, 12));
+    setMobileViewport(true);
+    render(<CyclePlanner />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Dodaj" }));
+    fireEvent.click(screen.getByRole("button", { name: /Dodaj miesiączkę/ }));
+    fireEvent.change(screen.getByLabelText("Pierwszy dzień miesiączki"), {
+      target: { value: "2026-09-28" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Dodaj miesiączkę" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/Następna miesiączka:/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText(/28 września 2026/));
+    fireEvent.click(screen.getByRole("button", { name: "Zaplanuj wyjazd od tego dnia" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByLabelText("Od")).toHaveValue("2026-09-28");
+    expect(screen.getByLabelText("Do")).toHaveValue("2026-09-28");
+  });
+
   it("keeps validation in the mobile drawer and closes it with Escape and backdrop", async () => {
     setMobileViewport(true);
     const { container } = render(<CyclePlanner />);
-    fireEvent.click(await screen.findByRole("button", { name: "Zarządzaj planami" }));
-    chooseTab("Cykl");
+    fireEvent.click(await screen.findByRole("button", { name: "Ustawienia" }));
+    chooseTab("Mój cykl");
     fireEvent.click(screen.getByRole("button", { name: "Dodaj miesiączkę" }));
     expect(screen.getByText("Podaj pierwszy dzień miesiączki.")).toBeInTheDocument();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Zarządzaj planami" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ustawienia" }));
     fireEvent.mouseDown(container.querySelector(".drawer-backdrop") as HTMLElement);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
@@ -354,21 +379,22 @@ describe("CyclePlanner", () => {
       }),
     );
     render(<CyclePlanner />);
-    await screen.findByRole("tab", { name: "Podsumowanie" });
+    await screen.findByRole("tab", { name: "Start" });
+    chooseTab("Ustawienia");
     expect(screen.getByRole("button", { name: "4 miesiące" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-    chooseTab("Wyjazdy");
+    chooseTab("Plany");
     addTrip("Lato");
-    chooseTab("Podsumowanie");
+    chooseTab("Ustawienia");
     fireEvent.click(screen.getByRole("button", { name: "Usuń dane" }));
     fireEvent.click(screen.getByRole("button", { name: "Usuń cykl, zachowaj wyjazdy" }));
     expect(JSON.parse(localStorage.getItem(storageKey) ?? "{}").cycleSettings).toBeNull();
     expect(JSON.parse(localStorage.getItem(storageKey) ?? "{}").periodEntries).toEqual([]);
-    chooseTab("Wyjazdy");
+    chooseTab("Plany");
     expect(screen.getAllByText("Lato").length).toBeGreaterThan(0);
-    chooseTab("Podsumowanie");
+    chooseTab("Ustawienia");
     fireEvent.click(screen.getByRole("button", { name: "Usuń dane" }));
     fireEvent.click(screen.getByRole("button", { name: "Usuń wszystko" }));
     expect(localStorage.getItem(panelTabKey)).toBeNull();
@@ -376,10 +402,10 @@ describe("CyclePlanner", () => {
 
   it("uses compact icon actions with localized accessible labels", async () => {
     const { container } = render(<CyclePlanner />);
-    await screen.findByRole("tab", { name: "Wyjazdy" });
-    chooseTab("Wyjazdy");
+    await screen.findByRole("tab", { name: "Plany" });
+    chooseTab("Plany");
     addTrip("Akcje");
-    chooseTab("Podsumowanie");
+    chooseTab("Ustawienia");
 
     const actions = container.querySelector(".actions-panel");
     expect(actions).not.toHaveTextContent("Eksportuj");
@@ -397,10 +423,12 @@ describe("CyclePlanner", () => {
     );
 
     fireEvent.change(screen.getByLabelText("Język"), { target: { value: "en" } });
+    chooseTab("Start");
     expect(
       screen.getByText(/Travel planning that knows your rhythm/),
     ).toHaveTextContent("No accounts, no cloud");
     expect(screen.getAllByText("Cycle Compass").length).toBeGreaterThan(0);
+    chooseTab("Settings");
     expect(screen.getByRole("button", { name: "Export PNG image" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Export to calendar (.ics)" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete data" })).toBeInTheDocument();
@@ -411,10 +439,10 @@ describe("CyclePlanner", () => {
       .spyOn(HTMLAnchorElement.prototype, "click")
       .mockImplementation(() => undefined);
     const { container } = render(<CyclePlanner />);
-    await screen.findByRole("tab", { name: "Wyjazdy" });
-    chooseTab("Wyjazdy");
+    await screen.findByRole("tab", { name: "Plany" });
+    chooseTab("Plany");
     addTrip("Góry");
-    chooseTab("Podsumowanie");
+    chooseTab("Ustawienia");
     expect(container.querySelector(".forecast-report")).toHaveTextContent("Góry");
     fireEvent.click(screen.getByLabelText("Wyjazdy"));
     expect(container.querySelector(".forecast-report")).not.toHaveTextContent("Góry");

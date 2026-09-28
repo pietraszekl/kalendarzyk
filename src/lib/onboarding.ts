@@ -1,6 +1,6 @@
 import { driver, type DriveStep } from "driver.js";
 
-export type PanelTab = "summary" | "trips" | "cycle";
+export type PanelTab = "summary" | "trips" | "cycle" | "settings";
 
 /**
  * Structural shape of the onboarding strings. Matched by both
@@ -59,37 +59,6 @@ export function resetOnboarding(): void {
 }
 
 /**
- * Returns the appropriate selector for a tab button depending on whether the
- * desktop sidebar or the mobile drawer is currently mounted.
- */
-function tabSelector(prefix: "desktop" | "drawer", tab: PanelTab): string {
-  return `#${prefix}-tab-${tab}`;
-}
-
-/**
- * Wait for an element to appear in the DOM. Driver.js's nextStep can be called
- * before React has re-rendered after opening the drawer or switching tab, so
- * we briefly poll for the selector before advancing.
- */
-function waitForSelector(selector: string, timeoutMs = 1200): Promise<void> {
-  return new Promise((resolve) => {
-    const start = Date.now();
-    const tick = () => {
-      if (document.querySelector(selector)) {
-        resolve();
-        return;
-      }
-      if (Date.now() - start > timeoutMs) {
-        resolve();
-        return;
-      }
-      requestAnimationFrame(tick);
-    };
-    tick();
-  });
-}
-
-/**
  * SECURITY — driver.js v1 renders popover title and description via
  * `element.innerHTML`, so any HTML in the string will be parsed.
  *
@@ -115,48 +84,12 @@ function assertStaticTourText(value: string): string {
 }
 
 export function startOnboarding(ctx: OnboardingContext): void {
-  const { t, isMobile, openDrawer, closeDrawer, selectPanelTab, onComplete } =
-    ctx;
+  const { t, isMobile, closeDrawer, selectPanelTab, onComplete } = ctx;
   const o: OnboardingCopy = t.onboarding;
-  const prefix: "desktop" | "drawer" = isMobile ? "drawer" : "desktop";
 
   // Make sure the panel is in a known starting state.
   if (isMobile) closeDrawer();
   else selectPanelTab("summary");
-
-  const ensureManageOpen = async () => {
-    if (isMobile) {
-      openDrawer("summary");
-      await waitForSelector(tabSelector("drawer", "summary"));
-    } else {
-      selectPanelTab("summary");
-    }
-  };
-
-  const ensureCycleTab = async () => {
-    if (isMobile) {
-      openDrawer("cycle");
-      await waitForSelector(tabSelector("drawer", "cycle"));
-    } else {
-      selectPanelTab("cycle");
-    }
-    await waitForSelector(".two-inputs.number-inputs label:nth-child(1) input");
-    // Scroll the cycle form into view so driver.js highlights an element the
-    // user can actually see (the form sits below section headings).
-    const target = document.querySelector(
-      ".two-inputs.number-inputs",
-    ) as HTMLElement | null;
-    target?.scrollIntoView({ block: "center", behavior: "smooth" });
-  };
-
-  const ensureTripsTab = async () => {
-    if (isMobile) {
-      openDrawer("trips");
-      await waitForSelector(tabSelector("drawer", "trips"));
-    } else {
-      selectPanelTab("trips");
-    }
-  };
 
   // Wrapper that fails fast if any of the tour copy contains raw HTML — a
   // belt-and-braces guard against the driver.js innerHTML sink (see comment
@@ -171,13 +104,13 @@ export function startOnboarding(ctx: OnboardingContext): void {
         description: safe(o.welcomeText),
       },
     },
-    // 2. Manage button / desktop sidebar
+    // 2. Quick add button / desktop sidebar
     {
-      element: isMobile ? ".mobile-manage-button" : ".desktop-sidebar",
+      element: isMobile ? ".mobile-bottom-add" : ".desktop-sidebar",
       popover: {
         title: safe(o.manageTitle),
         description: safe(isMobile ? o.manageText : o.manageTextDesktop),
-        side: isMobile ? "bottom" : "right",
+        side: isMobile ? "top" : "right",
         align: "start",
       },
       onHighlightStarted: () => {
@@ -186,61 +119,7 @@ export function startOnboarding(ctx: OnboardingContext): void {
         if (isMobile) closeDrawer();
       },
     },
-    // 3. Cycle tab
-    {
-      element: tabSelector(prefix, "cycle"),
-      popover: {
-        title: safe(o.cycleTabTitle),
-        description: safe(o.cycleTabText),
-        side: isMobile ? "bottom" : "right",
-      },
-      onHighlightStarted: () => {
-        void ensureManageOpen();
-      },
-    },
-    // 4. Typical cycle length input
-    {
-      element: ".two-inputs.number-inputs label:nth-child(1) .number-field",
-      popover: {
-        title: safe(o.cycleLengthTitle),
-        description: safe(o.cycleLengthText),
-        side: isMobile ? "bottom" : "right",
-      },
-      onHighlightStarted: () => {
-        void ensureCycleTab();
-      },
-    },
-    // 5. Typical bleeding length input
-    {
-      element: ".two-inputs.number-inputs label:nth-child(2) .number-field",
-      popover: {
-        title: safe(o.periodLengthTitle),
-        description: safe(o.periodLengthText),
-        side: isMobile ? "bottom" : "right",
-      },
-    },
-    // 6. First day of period
-    {
-      element: '.period-form input[type="date"]',
-      popover: {
-        title: safe(o.firstDayTitle),
-        description: safe(o.firstDayText),
-        side: isMobile ? "top" : "right",
-      },
-    },
-    // 7. Trips tab
-    {
-      element: tabSelector(prefix, "trips"),
-      popover: {
-        title: safe(o.tripsTitle),
-        description: safe(o.tripsText),
-        side: isMobile ? "bottom" : "right",
-      },
-      onHighlightStarted: () => {
-        void ensureTripsTab();
-      },
-    },
-    // 8. Done (centered)
+    // 3. Done (centered)
     {
       popover: {
         title: safe(o.doneTitle),
